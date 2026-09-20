@@ -1,6 +1,7 @@
 const express = require("express");
 const multer = require("multer");
 const authMiddleware = require("../middleware/auth.middleware");
+const asyncHandler = require("../utils/asyncHandler");
 const { uploadCsv } = require("../controllers/upload.controller");
 
 const router = express.Router();
@@ -19,6 +20,6 @@ const upload = multer({
   }
 });
 
-router.post("/csv", authMiddleware, upload.single("file"), uploadCsv);
+router.post("/csv", authMiddleware, upload.single("file"), asyncHandler(uploadCsv));
 
 module.exports = router;
