@@ -13,7 +13,7 @@ const register = async (req, res) => {
     }
 
     const [existingUsers] = await pool.execute(
-      "SELECT user_id FROM users WHERE email = ? LIMIT 1",
+      "SELECT user_id FROM Users WHERE email = ? LIMIT 1",
       [email]
     );
 
@@ -25,15 +25,34 @@ const register = async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const [result] = await pool.execute(
-      "INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
-      [name, email, passwordHash]
-    );
+    const connection = await pool.getConnection();
+    let userId;
+    try {
+      await connection.beginTransaction();
+
+      const [result] = await connection.execute(
+        "INSERT INTO Users (full_name, email, password_hash) VALUES (?, ?, ?)",
+        [name, email, passwordHash]
+      );
+      userId = result.insertId;
+
+      await connection.execute(
+        "INSERT INTO UserSettings (user_id) VALUES (?)",
+        [userId]
+      );
+
+      await connection.commit();
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
 
     return res.status(201).json({
       message: "Registration successful",
       user: {
-        id: result.insertId,
+        id: userId,
         name,
         email
       }
@@ -57,7 +76,7 @@ const login = async (req, res) => {
     }
 
     const [users] = await pool.execute(
-      "SELECT * FROM users WHERE email = ? LIMIT 1",
+      "SELECT * FROM Users WHERE email = ? LIMIT 1",
       [email]
     );
 
@@ -83,7 +102,8 @@ const login = async (req, res) => {
     const token = jwt.sign(
       {
         id: user.user_id,
-        email: user.email
+        email: user.email,
+        role: user.role
       },
       process.env.JWT_SECRET,
       { expiresIn: "24h" }
@@ -94,8 +114,9 @@ const login = async (req, res) => {
       token,
       user: {
         id: user.user_id,
-        name: user.name,
-        email: user.email
+        name: user.full_name,
+        email: user.email,
+        role: user.role
       }
     });
   } catch (error) {

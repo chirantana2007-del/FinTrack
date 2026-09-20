@@ -1,94 +1,72 @@
-const CATEGORY_RULES = {
-  Food: [
-    "swiggy",
-    "zomato",
-    "mcdonald",
-    "kfc",
-    "subway",
-    "dominos",
-    "restaurant",
-    "cafe",
-    "coffee"
-  ],
+const pool = require("../config/db");
 
-  Transport: [
-    "uber",
-    "ola",
-    "rapido",
-    "metro",
-    "petrol",
-    "fuel",
-    "shell",
-    "parking"
-  ],
+function matchesRule(normalizedDescription, rule) {
+  const pattern = (rule.pattern || "").toLowerCase();
 
-  Shopping: [
-    "amazon",
-    "flipkart",
-    "myntra",
-    "walmart",
-    "target",
-    "mall",
-    "store"
-  ],
+  switch (rule.match_type) {
+    case "contains":
+      return normalizedDescription.includes(pattern);
+    case "starts_with":
+      return normalizedDescription.startsWith(pattern);
+    case "exact":
+      return normalizedDescription === pattern;
+    case "regex":
+      try {
+        return new RegExp(rule.pattern, "i").test(normalizedDescription);
+      } catch (err) {
+        return false;
+      }
+    default:
+      return false;
+  }
+}
 
-  Entertainment: [
-    "netflix",
-    "spotify",
-    "prime video",
-    "youtube",
-    "movie",
-    "cinema"
-  ],
+// Category resolution order: the user's own CategoryRules (by priority) first,
+// then the global fn_categorize_transaction() DB function as a fallback, then
+// Uncategorized (categoryId: null, needsReview: true).
+const categorizeTransaction = async (description, userId, conn = pool) => {
+  const normalized = (description || "").toLowerCase().trim();
 
-  Bills: [
-    "electricity",
-    "water bill",
-    "internet",
-    "wifi",
-    "phone bill",
-    "airtel",
-    "jio"
-  ],
-
-  Health: [
-    "pharmacy",
-    "medical",
-    "hospital",
-    "apollo",
-    "clinic"
-  ],
-
-  Education: [
-    "college",
-    "university",
-    "course",
-    "udemy",
-    "coursera"
-  ]
-};
-
-const categorizeTransaction = (description) => {
-  if (!description) {
-    return "Other";
+  if (!normalized) {
+    return { categoryId: null, needsReview: true };
   }
 
-  const text = description.toLowerCase();
+  const [userRules] = await conn.execute(
+    `SELECT category_id, match_type, pattern
+     FROM CategoryRules
+     WHERE user_id = ? AND is_active = 1
+     ORDER BY priority ASC`,
+    [userId]
+  );
 
-  for (const [category, keywords] of Object.entries(CATEGORY_RULES)) {
-    if (keywords.some((keyword) => text.includes(keyword))) {
-      return category;
-    }
+  const matchedUserRule = userRules.find((rule) => matchesRule(normalized, rule));
+  if (matchedUserRule) {
+    return { categoryId: matchedUserRule.category_id, needsReview: false };
   }
 
-  return "Other";
+  const [[fallback]] = await conn.query(
+    "SELECT fn_categorize_transaction(?) AS category_id",
+    [description]
+  );
+
+  if (fallback && fallback.category_id) {
+    return { categoryId: fallback.category_id, needsReview: false };
+  }
+
+  return { categoryId: null, needsReview: true };
 };
 
-const categorizeTransactions = (transactions) => {
-  return transactions.map((transaction) => ({
-    ...transaction,
-    category: categorizeTransaction(transaction.description)
-  }));
+const categorizeTransactions = async (transactions, userId, conn = pool) => {
+  const results = [];
+  for (const transaction of transactions) {
+    const { categoryId, needsReview } = await categorizeTransaction(
+      transaction.description,
+      userId,
+      conn
+    );
+    results.push({ ...transaction, categoryId, needsReview });
+  }
+  return results;
 };
 
 module.exports = {
