@@ -1,6 +1,46 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import apiClient from '../api/client';
+
+const LIMIT = 10;
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(`${dateStr}T00:00:00`);
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatAmount(amount) {
+  const value = Number(amount);
+  const sign = value < 0 ? '-' : '+';
+  return `${sign}₹${Math.abs(value).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+}
 
 export default function Transactions() {
+  const [transactions, setTransactions] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setLoading(true);
+      setError('');
+      apiClient
+        .get('/transactions', { params: { page, limit: LIMIT, search: search || undefined } })
+        .then((response) => {
+          setTransactions(response.data.transactions);
+          setTotal(response.data.total);
+        })
+        .catch((err) => setError(err.response?.data?.message || 'Failed to load transactions'))
+        .finally(() => setLoading(false));
+    }, search ? 300 : 0);
+    return () => clearTimeout(handle);
+  }, [page, search]);
+
+  const totalPages = Math.max(1, Math.ceil(total / LIMIT));
+
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="w-full h-full px-margin-desktop flex items-center justify-between"><div className="flex items-center gap-space-lg"><div className="flex items-center gap-space-sm"><img alt="Brand logo. - Primary color: #0b1f3a
@@ -20,7 +60,7 @@ export default function Transactions() {
 </div>
 <div className="flex items-baseline gap-space-sm flex-wrap">
 <h1 className="font-headline-lg text-headline-lg text-primary tracking-tight font-semibold">Transaction Ledger</h1>
-<span className="px-2 py-0.5 rounded-lg bg-surface-container-high text-on-surface-variant font-numeric-sm text-numeric-sm font-semibold">Total 1,037 Transactions</span>
+<span className="px-2 py-0.5 rounded-lg bg-surface-container-high text-on-surface-variant font-numeric-sm text-numeric-sm font-semibold">Total {total.toLocaleString('en-IN')} Transactions</span>
 </div>
 </div>
 {/*  Quick Action Utilities  */}
@@ -81,7 +121,7 @@ export default function Transactions() {
 {/*  Search Input  */}
 <div className="relative flex-1 min-w-[240px]">
 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
-<input className="w-full pl-9 pr-4 py-2 text-on-surface font-body-md text-body-md rounded bg-surface-container-low focus:bg-surface-container-lowest transition-colors placeholder:text-outline focus:outline-none" id="tableSearch" placeholder="Search merchant, description, UTR or reference ID..." type="text"/>
+<input value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} className="w-full pl-9 pr-4 py-2 text-on-surface font-body-md text-body-md rounded bg-surface-container-low focus:bg-surface-container-lowest transition-colors placeholder:text-outline focus:outline-none" id="tableSearch" placeholder="Search merchant, description, UTR or reference ID..." type="text"/>
 </div>
 {/*  Dense Filter Selectors  */}
 <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-space-xs">
@@ -179,93 +219,60 @@ export default function Transactions() {
 </tr>
 </thead>
 <tbody className="divide-none text-on-surface font-body-md text-body-md" id="ledgerBody">
-{/*  Row 1: Swiggy  */}
-<tr className="hover:bg-surface-container-low transition-colors group">
+{loading && (
+<tr><td className="py-6 px-4 text-center text-on-surface-variant" colSpan={8}>Loading transactions…</td></tr>
+)}
+{!loading && error && (
+<tr><td className="py-6 px-4 text-center text-error" colSpan={8}>{error}</td></tr>
+)}
+{!loading && !error && transactions.length === 0 && (
+<tr><td className="py-6 px-4 text-center text-on-surface-variant" colSpan={8}>No transactions found.</td></tr>
+)}
+{!loading && !error && transactions.map((t) => (
+<tr key={t.transaction_id} className="hover:bg-surface-container-low transition-colors group">
 <td className="py-2.5 px-4 text-center">
-<input aria-label="Select transaction 24 Oct" className="rounded bg-surface-container-lowest cursor-pointer" type="checkbox"/>
+<input aria-label={`Select transaction ${t.transaction_id}`} className="rounded bg-surface-container-lowest cursor-pointer" type="checkbox"/>
 </td>
 <td className="py-2.5 px-4 whitespace-nowrap">
-<span className="font-numeric-md text-numeric-md font-medium text-on-surface">24 Oct 2024</span>
-<span className="block font-label-sm text-label-sm text-outline">21:42 IST</span>
+<span className="font-numeric-md text-numeric-md font-medium text-on-surface">{formatDate(t.transaction_date)}</span>
 </td>
 <td className="py-2.5 px-4 min-w-0">
 <div className="flex items-center gap-space-sm">
 <div className="w-7 h-7 rounded bg-surface-container-high flex items-center justify-center shrink-0 text-primary-container">
-<span className="material-symbols-outlined text-[16px]">restaurant</span>
+<span className="material-symbols-outlined text-[16px]">receipt_long</span>
 </div>
 <div className="flex flex-col min-w-0">
-<span className="font-body-md text-body-md font-semibold text-on-surface truncate">Swiggy Bundl Technologies</span>
-<span className="font-label-sm text-label-sm text-outline truncate">Bangalore • UPI/swiggy@icici/02910</span>
+<span className="font-body-md text-body-md font-semibold text-on-surface truncate">{t.merchant_name || t.description}</span>
+<span className="font-label-sm text-label-sm text-outline truncate">{t.description}</span>
 </div>
 </div>
 </td>
 <td className="py-2.5 px-4 whitespace-nowrap">
 <span className="inline-flex items-center px-2 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm font-semibold">
-                Dining &amp; Food
-              </span>
+{t.category_name || 'Uncategorized'}
+</span>
 </td>
 <td className="py-2.5 px-4 whitespace-nowrap">
 <div className="flex items-center gap-1.5">
 <span className="w-2 h-2 rounded-full bg-primary-container"></span>
-<span className="font-label-md text-label-md text-on-surface font-medium">HDFC Bank</span>
-<span className="font-label-sm text-label-sm text-outline">••4091</span>
+<span className="font-label-md text-label-md text-on-surface font-medium">{t.account_name}</span>
 </div>
 </td>
 <td className="py-2.5 px-4 whitespace-nowrap">
-<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container text-on-primary-fixed-variant font-label-sm text-label-sm font-medium">
-<span className="material-symbols-outlined text-[12px]">code</span>
-                Rule #12: POS Keyword
+{t.needs_review ? (
+<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-error-container text-on-error-container font-label-sm text-label-sm font-medium">
+<span className="material-symbols-outlined text-[12px]">flag</span>
+                Needs Review
               </span>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap text-right">
-<span className="font-numeric-md text-numeric-md font-semibold text-on-surface">-₹640.00</span>
-</td>
-<td className="py-2.5 px-4 text-center whitespace-nowrap">
-<button className="p-1 rounded hover:bg-surface-container-high text-outline group-hover:text-primary-container transition-colors" title="Audit Transaction Details">
-<span className="material-symbols-outlined text-[18px]">more_horiz</span>
-</button>
-</td>
-</tr>
-{/*  Row 2: Zepto  */}
-<tr className="hover:bg-surface-container-low transition-colors group bg-surface-container-lowest">
-<td className="py-2.5 px-4 text-center">
-<input aria-label="Select transaction 23 Oct" className="rounded bg-surface-container-lowest cursor-pointer" type="checkbox"/>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="font-numeric-md text-numeric-md font-medium text-on-surface">23 Oct 2024</span>
-<span className="block font-label-sm text-label-sm text-outline">08:15 IST</span>
-</td>
-<td className="py-2.5 px-4 min-w-0">
-<div className="flex items-center gap-space-sm">
-<div className="w-7 h-7 rounded bg-secondary-container flex items-center justify-center shrink-0 text-on-secondary-container">
-<span className="material-symbols-outlined text-[16px]">shopping_basket</span>
-</div>
-<div className="flex flex-col min-w-0">
-<span className="font-body-md text-body-md font-semibold text-on-surface truncate">Zepto Quick Commerce</span>
-<span className="font-label-sm text-label-sm text-outline truncate">Mumbai • Kirana POS Instant</span>
-</div>
-</div>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="inline-flex items-center px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm font-semibold">
-                Groceries
-              </span>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<div className="flex items-center gap-1.5">
-<span className="w-2 h-2 rounded-full bg-primary-container"></span>
-<span className="font-label-md text-label-md text-on-surface font-medium">HDFC Bank</span>
-<span className="font-label-sm text-label-sm text-outline">••4091</span>
-</div>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
+) : (
 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container text-on-primary-fixed-variant font-label-sm text-label-sm font-medium">
 <span className="material-symbols-outlined text-[12px]">verified</span>
-                Rule #04: Exact Match
+                Auto-categorized
               </span>
+)}
 </td>
 <td className="py-2.5 px-4 whitespace-nowrap text-right">
-<span className="font-numeric-md text-numeric-md font-semibold text-on-surface">-₹849.50</span>
+<span className={`font-numeric-md text-numeric-md font-semibold ${Number(t.amount) < 0 ? 'text-on-surface' : 'text-secondary'}`}>{formatAmount(t.amount)}</span>
 </td>
 <td className="py-2.5 px-4 text-center whitespace-nowrap">
 <button className="p-1 rounded hover:bg-surface-container-high text-outline group-hover:text-primary-container transition-colors" title="Audit Transaction Details">
@@ -273,288 +280,7 @@ export default function Transactions() {
 </button>
 </td>
 </tr>
-{/*  Row 3: Infosys Tech Salary Credit  */}
-<tr className="hover:bg-surface-container-low transition-colors group bg-surface-container-low/50">
-<td className="py-2.5 px-4 text-center">
-<input aria-label="Select transaction 22 Oct" className="rounded bg-surface-container-lowest cursor-pointer" type="checkbox"/>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="font-numeric-md text-numeric-md font-semibold text-secondary">22 Oct 2024</span>
-<span className="block font-label-sm text-label-sm text-outline">00:04 IST</span>
-</td>
-<td className="py-2.5 px-4 min-w-0">
-<div className="flex items-center gap-space-sm">
-<div className="w-7 h-7 rounded bg-secondary text-on-secondary flex items-center justify-center shrink-0">
-<span className="material-symbols-outlined text-[16px]">account_balance</span>
-</div>
-<div className="flex flex-col min-w-0">
-<span className="font-body-md text-body-md font-semibold text-on-surface truncate">Infosys Tech Salary Credit</span>
-<span className="font-label-sm text-label-sm text-outline truncate">CMS/SAL/OCT2024/INFY-948123</span>
-</div>
-</div>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="inline-flex items-center px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm font-semibold">
-                Income / Salary
-              </span>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<div className="flex items-center gap-1.5">
-<span className="w-2 h-2 rounded-full bg-primary-container"></span>
-<span className="font-label-md text-label-md text-on-surface font-medium">HDFC Bank</span>
-<span className="font-label-sm text-label-sm text-outline">••4091</span>
-</div>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-secondary-container text-on-secondary-container font-label-sm text-label-sm font-semibold">
-<span className="material-symbols-outlined text-[12px]">security</span>
-                Rule #01: Payroll Direct
-              </span>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap text-right">
-<span className="font-numeric-md text-numeric-md font-semibold text-secondary">+₹1,25,000.00</span>
-</td>
-<td className="py-2.5 px-4 text-center whitespace-nowrap">
-<button className="p-1 rounded hover:bg-surface-container-high text-outline group-hover:text-primary-container transition-colors" title="Audit Transaction Details">
-<span className="material-symbols-outlined text-[18px]">more_horiz</span>
-</button>
-</td>
-</tr>
-{/*  Row 4: Uber India Systems  */}
-<tr className="hover:bg-surface-container-low transition-colors group">
-<td className="py-2.5 px-4 text-center">
-<input aria-label="Select transaction 20 Oct" className="rounded bg-surface-container-lowest cursor-pointer" type="checkbox"/>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="font-numeric-md text-numeric-md font-medium text-on-surface">20 Oct 2024</span>
-<span className="block font-label-sm text-label-sm text-outline">19:22 IST</span>
-</td>
-<td className="py-2.5 px-4 min-w-0">
-<div className="flex items-center gap-space-sm">
-<div className="w-7 h-7 rounded bg-primary-fixed flex items-center justify-center shrink-0 text-on-primary-fixed">
-<span className="material-symbols-outlined text-[16px]">directions_car</span>
-</div>
-<div className="flex flex-col min-w-0">
-<span className="font-body-md text-body-md font-semibold text-on-surface truncate">Uber India Systems Pvt Ltd</span>
-<span className="font-label-sm text-label-sm text-outline truncate">Trip ID CRN83910042 • Electronic City</span>
-</div>
-</div>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="inline-flex items-center px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm font-semibold">
-                Transportation
-              </span>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<div className="flex items-center gap-1.5">
-<span className="w-2 h-2 rounded-full bg-outline"></span>
-<span className="font-label-md text-label-md text-on-surface font-medium">ICICI Bank</span>
-<span className="font-label-sm text-label-sm text-outline">••1822</span>
-</div>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container text-on-primary-fixed-variant font-label-sm text-label-sm font-medium">
-<span className="material-symbols-outlined text-[12px]">filter_center_focus</span>
-                Rule #19: Keyword
-              </span>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap text-right">
-<span className="font-numeric-md text-numeric-md font-semibold text-on-surface">-₹420.00</span>
-</td>
-<td className="py-2.5 px-4 text-center whitespace-nowrap">
-<button className="p-1 rounded hover:bg-surface-container-high text-outline group-hover:text-primary-container transition-colors" title="Audit Transaction Details">
-<span className="material-symbols-outlined text-[18px]">more_horiz</span>
-</button>
-</td>
-</tr>
-{/*  Row 5: AWS EMEA Cloud Services  */}
-<tr className="hover:bg-surface-container-low transition-colors group">
-<td className="py-2.5 px-4 text-center">
-<input aria-label="Select transaction 19 Oct" className="rounded bg-surface-container-lowest cursor-pointer" type="checkbox"/>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="font-numeric-md text-numeric-md font-medium text-on-surface">19 Oct 2024</span>
-<span className="block font-label-sm text-label-sm text-outline">14:02 IST</span>
-</td>
-<td className="py-2.5 px-4 min-w-0">
-<div className="flex items-center gap-space-sm">
-<div className="w-7 h-7 rounded bg-surface-variant flex items-center justify-center shrink-0 text-on-surface-variant">
-<span className="material-symbols-outlined text-[16px]">cloud</span>
-</div>
-<div className="flex flex-col min-w-0">
-<span className="font-body-md text-body-md font-semibold text-on-surface truncate">AWS EMEA Cloud Services</span>
-<span className="font-label-sm text-label-sm text-outline truncate">Luxembourg • Monthly Compute EC2</span>
-</div>
-</div>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="inline-flex items-center px-2 py-0.5 rounded bg-surface-variant text-on-surface font-label-sm text-label-sm font-semibold">
-                Subscriptions
-              </span>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<div className="flex items-center gap-1.5">
-<span className="w-2 h-2 rounded-full bg-outline"></span>
-<span className="font-label-md text-label-md text-on-surface font-medium">ICICI Bank</span>
-<span className="font-label-sm text-label-sm text-outline">••1822</span>
-</div>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm font-semibold">
-<span className="material-symbols-outlined text-[12px]">auto_awesome</span>
-                AI Heuristic: Recurrence
-              </span>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap text-right">
-<span className="font-numeric-md text-numeric-md font-semibold text-on-surface">-₹3,418.20</span>
-</td>
-<td className="py-2.5 px-4 text-center whitespace-nowrap">
-<button className="p-1 rounded hover:bg-surface-container-high text-outline group-hover:text-primary-container transition-colors" title="Audit Transaction Details">
-<span className="material-symbols-outlined text-[18px]">more_horiz</span>
-</button>
-</td>
-</tr>
-{/*  Row 6: Cult.fit Healthcare Bangalore  */}
-<tr className="hover:bg-surface-container-low transition-colors group">
-<td className="py-2.5 px-4 text-center">
-<input aria-label="Select transaction 18 Oct" className="rounded bg-surface-container-lowest cursor-pointer" type="checkbox"/>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="font-numeric-md text-numeric-md font-medium text-on-surface">18 Oct 2024</span>
-<span className="block font-label-sm text-label-sm text-outline">11:18 IST</span>
-</td>
-<td className="py-2.5 px-4 min-w-0">
-<div className="flex items-center gap-space-sm">
-<div className="w-7 h-7 rounded bg-error-container flex items-center justify-center shrink-0 text-on-error-container">
-<span className="material-symbols-outlined text-[16px]">fitness_center</span>
-</div>
-<div className="flex flex-col min-w-0">
-<span className="font-body-md text-body-md font-semibold text-on-surface truncate">Cult.fit Healthcare Bangalore</span>
-<span className="font-label-sm text-label-sm text-outline truncate">POS/CULTCORAMANGALA/8821</span>
-</div>
-</div>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="inline-flex items-center px-2 py-0.5 rounded bg-error-container text-on-error-container font-label-sm text-label-sm font-semibold">
-                Fitness &amp; Health
-              </span>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<div className="flex items-center gap-1.5">
-<span className="w-2 h-2 rounded-full bg-outline"></span>
-<span className="font-label-md text-label-md text-on-surface font-medium">ICICI Bank</span>
-<span className="font-label-sm text-label-sm text-outline">••1822</span>
-</div>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container text-on-primary-fixed-variant font-label-sm text-label-sm font-medium">
-<span className="material-symbols-outlined text-[12px]">storefront</span>
-                Rule #33: Merchant
-              </span>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap text-right">
-<span className="font-numeric-md text-numeric-md font-semibold text-on-surface">-₹1,750.00</span>
-</td>
-<td className="py-2.5 px-4 text-center whitespace-nowrap">
-<button className="p-1 rounded hover:bg-surface-container-high text-outline group-hover:text-primary-container transition-colors" title="Audit Transaction Details">
-<span className="material-symbols-outlined text-[18px]">more_horiz</span>
-</button>
-</td>
-</tr>
-{/*  Row 7: Tata Power Electricity Bill  */}
-<tr className="hover:bg-surface-container-low transition-colors group">
-<td className="py-2.5 px-4 text-center">
-<input aria-label="Select transaction 17 Oct" className="rounded bg-surface-container-lowest cursor-pointer" type="checkbox"/>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="font-numeric-md text-numeric-md font-medium text-on-surface">17 Oct 2024</span>
-<span className="block font-label-sm text-label-sm text-outline">16:45 IST</span>
-</td>
-<td className="py-2.5 px-4 min-w-0">
-<div className="flex items-center gap-space-sm">
-<div className="w-7 h-7 rounded bg-surface-container-high flex items-center justify-center shrink-0 text-primary-container">
-<span className="material-symbols-outlined text-[16px]">bolt</span>
-</div>
-<div className="flex flex-col min-w-0">
-<span className="font-body-md text-body-md font-semibold text-on-surface truncate">Tata Power Electricity Bill</span>
-<span className="font-label-sm text-label-sm text-outline truncate">BBPS/TPMUMBAI/CA9018442</span>
-</div>
-</div>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="inline-flex items-center px-2 py-0.5 rounded bg-primary-fixed-dim text-on-primary-fixed font-label-sm text-label-sm font-semibold">
-                Utilities
-              </span>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<div className="flex items-center gap-1.5">
-<span className="w-2 h-2 rounded-full bg-primary-container"></span>
-<span className="font-label-md text-label-md text-on-surface font-medium">HDFC Bank</span>
-<span className="font-label-sm text-label-sm text-outline">••4091</span>
-</div>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container text-on-primary-fixed-variant font-label-sm text-label-sm font-medium">
-<span className="material-symbols-outlined text-[12px]">receipt</span>
-                Rule #08: Bill Desk
-              </span>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap text-right">
-<span className="font-numeric-md text-numeric-md font-semibold text-on-surface">-₹2,890.00</span>
-</td>
-<td className="py-2.5 px-4 text-center whitespace-nowrap">
-<button className="p-1 rounded hover:bg-surface-container-high text-outline group-hover:text-primary-container transition-colors" title="Audit Transaction Details">
-<span className="material-symbols-outlined text-[18px]">more_horiz</span>
-</button>
-</td>
-</tr>
-{/*  Row 8: Blue Tokai Coffee Roasters  */}
-<tr className="hover:bg-surface-container-low transition-colors group">
-<td className="py-2.5 px-4 text-center">
-<input aria-label="Select transaction 15 Oct" className="rounded bg-surface-container-lowest cursor-pointer" type="checkbox"/>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="font-numeric-md text-numeric-md font-medium text-on-surface">15 Oct 2024</span>
-<span className="block font-label-sm text-label-sm text-outline">10:20 IST</span>
-</td>
-<td className="py-2.5 px-4 min-w-0">
-<div className="flex items-center gap-space-sm">
-<div className="w-7 h-7 rounded bg-tertiary-fixed-dim flex items-center justify-center shrink-0 text-on-tertiary-fixed">
-<span className="material-symbols-outlined text-[16px]">coffee</span>
-</div>
-<div className="flex flex-col min-w-0">
-<span className="font-body-md text-body-md font-semibold text-on-surface truncate">Blue Tokai Coffee Roasters</span>
-<span className="font-label-sm text-label-sm text-outline truncate">Indiranagar 100ft • EDC Term 041</span>
-</div>
-</div>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="inline-flex items-center px-2 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm font-semibold">
-                Dining &amp; Food
-              </span>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<div className="flex items-center gap-1.5">
-<span className="w-2 h-2 rounded-full bg-outline"></span>
-<span className="font-label-md text-label-md text-on-surface font-medium">ICICI Bank</span>
-<span className="font-label-sm text-label-sm text-outline">••1822</span>
-</div>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap">
-<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-tertiary-fixed-dim text-on-tertiary-fixed font-label-sm text-label-sm font-semibold">
-<span className="material-symbols-outlined text-[12px]">psychology_alt</span>
-                AI Levenshtein (0.91)
-              </span>
-</td>
-<td className="py-2.5 px-4 whitespace-nowrap text-right">
-<span className="font-numeric-md text-numeric-md font-semibold text-on-surface">-₹520.00</span>
-</td>
-<td className="py-2.5 px-4 text-center whitespace-nowrap">
-<button className="p-1 rounded hover:bg-surface-container-high text-outline group-hover:text-primary-container transition-colors" title="Audit Transaction Details">
-<span className="material-symbols-outlined text-[18px]">more_horiz</span>
-</button>
-</td>
-</tr>
+))}
 </tbody>
 </table>
 </div>
@@ -562,29 +288,17 @@ export default function Transactions() {
 <div className="p-space-md bg-surface-container-low flex flex-col md:flex-row items-center justify-between gap-space-md">
 {/*  Showing count text  */}
 <div className="flex items-center gap-space-xs text-on-surface-variant font-body-sm text-body-sm">
-<span>Showing <span className="font-semibold text-on-surface">1</span> to <span className="font-semibold text-on-surface">8</span> of <span className="font-semibold text-on-surface">1,037</span> transactions</span>
-<span className="text-outline">|</span>
-<span className="text-secondary font-medium">Query executed in 14ms (Indexed Cache)</span>
+<span>Showing <span className="font-semibold text-on-surface">{total === 0 ? 0 : (page - 1) * LIMIT + 1}</span> to <span className="font-semibold text-on-surface">{Math.min(page * LIMIT, total)}</span> of <span className="font-semibold text-on-surface">{total.toLocaleString('en-IN')}</span> transactions</span>
 </div>
 {/*  Pagination Buttons  */}
 <div className="flex items-center gap-1 select-none">
-<button className="px-2.5 py-1 rounded bg-surface-container-lowest text-outline hover:text-on-surface text-label-sm font-label-sm font-semibold shadow-sm disabled:opacity-40" disabled="">
+<button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="px-2.5 py-1 rounded bg-surface-container-lowest text-outline hover:text-on-surface text-label-sm font-label-sm font-semibold shadow-sm disabled:opacity-40">
           Previous
         </button>
-<button className="w-8 h-8 rounded bg-primary-container text-on-primary font-numeric-sm text-numeric-sm font-semibold shadow-sm flex items-center justify-center">
-          1
-        </button>
-<button className="w-8 h-8 rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container-high font-numeric-sm text-numeric-sm font-semibold shadow-sm flex items-center justify-center transition-colors">
-          2
-        </button>
-<button className="w-8 h-8 rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container-high font-numeric-sm text-numeric-sm font-semibold shadow-sm flex items-center justify-center transition-colors">
-          3
-        </button>
-<span className="px-1 text-outline font-numeric-sm text-numeric-sm">...</span>
-<button className="w-8 h-8 rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container-high font-numeric-sm text-numeric-sm font-semibold shadow-sm flex items-center justify-center transition-colors">
-          130
-        </button>
-<button className="px-2.5 py-1 rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container-high text-label-sm font-label-sm font-semibold shadow-sm transition-colors">
+<span className="w-8 h-8 rounded bg-primary-container text-on-primary font-numeric-sm text-numeric-sm font-semibold shadow-sm flex items-center justify-center">
+          {page}
+        </span>
+<button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="px-2.5 py-1 rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container-high text-label-sm font-label-sm font-semibold shadow-sm transition-colors disabled:opacity-40">
           Next
         </button>
 </div>

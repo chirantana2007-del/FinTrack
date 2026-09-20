@@ -1,6 +1,65 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import apiClient from '../api/client';
+
+function currentMonthValue() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatCurrency(amount) {
+  return `₹${Number(amount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+}
 
 export default function Budgets() {
+  const [budgets, setBudgets] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [categoryId, setCategoryId] = useState('');
+  const [limitAmount, setLimitAmount] = useState('');
+  const [periodMonth, setPeriodMonth] = useState(currentMonthValue());
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+
+  const loadBudgets = () => {
+    setLoading(true);
+    setError('');
+    apiClient
+      .get('/budgets')
+      .then((response) => setBudgets(response.data.budgets))
+      .catch((err) => setError(err.response?.data?.message || 'Failed to load budgets'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadBudgets();
+    apiClient.get('/categories').then((response) => {
+      setCategories(response.data.categories.filter((c) => c.type === 'expense'));
+    }).catch(() => {});
+  }, []);
+
+  const handleCreateBudget = async (e) => {
+    e.preventDefault();
+    if (!categoryId || !limitAmount) {
+      setCreateError('Choose a category and enter a limit.');
+      return;
+    }
+    setCreating(true);
+    setCreateError('');
+    try {
+      await apiClient.post('/budgets', { category_id: categoryId, limit_amount: limitAmount, period_month: periodMonth });
+      setCategoryId('');
+      setLimitAmount('');
+      setShowCreateForm(false);
+      loadBudgets();
+    } catch (err) {
+      setCreateError(err.response?.data?.message || 'Failed to create budget');
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="w-full h-full px-margin-desktop flex items-center justify-between"><div className="flex items-center gap-space-lg"><div className="flex items-center gap-space-sm"><img alt="Brand logo. - Primary color: #0b1f3a
@@ -77,9 +136,9 @@ export default function Budgets() {
 <span className="material-symbols-outlined text-[18px] text-outline">tune</span>
 <span>Rebalance</span>
 </button>
-<button className="px-space-md py-2 rounded-lg bg-primary-container hover:bg-primary text-on-primary font-label-md text-label-md shadow-sm transition-all duration-150 flex items-center gap-1.5 cursor-pointer" id="open-modal-btn">
+<button onClick={() => setShowCreateForm((s) => !s)} className="px-space-md py-2 rounded-lg bg-primary-container hover:bg-primary text-on-primary font-label-md text-label-md shadow-sm transition-all duration-150 flex items-center gap-1.5 cursor-pointer" id="open-modal-btn" type="button">
 <span className="material-symbols-outlined text-[18px]">add_circle</span>
-<span>+ Create New Budget or Goal</span>
+<span>{showCreateForm ? 'Cancel' : '+ Create New Budget'}</span>
 </button>
 </div>
 </div>
@@ -162,229 +221,98 @@ export default function Budgets() {
 <div className="flex items-center justify-between">
 <div className="flex items-center gap-2">
 <h3 className="font-headline-sm text-headline-sm text-on-surface">Category Allocations &amp; Thresholds</h3>
-<span className="px-2 py-0.5 rounded-full bg-surface-container font-numeric-sm text-numeric-sm text-outline">5 Rules Evaluated</span>
-</div>
-<div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-lg text-outline">
-<button className="px-2.5 py-1 rounded bg-surface-container-lowest text-on-surface font-label-sm text-label-sm shadow-sm font-semibold">Active Cycle</button>
-<button className="px-2.5 py-1 rounded hover:bg-surface-container font-label-sm text-label-sm transition-colors">Historical Delta</button>
+<span className="px-2 py-0.5 rounded-full bg-surface-container font-numeric-sm text-numeric-sm text-outline">{budgets.length} Rules Evaluated</span>
 </div>
 </div>
+{showCreateForm && (
+<form onSubmit={handleCreateBudget} className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col sm:flex-row items-end gap-space-sm">
+<div className="flex flex-col gap-1 flex-1 w-full">
+<label className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">Category</label>
+<select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full bg-surface-container-low px-3 py-2 rounded-lg font-body-md text-body-md text-on-surface outline-none focus:bg-surface-container-lowest shadow-sm">
+<option value="">Select a category…</option>
+{categories.map((c) => (
+<option key={c.category_id} value={c.category_id}>{c.name}</option>
+))}
+</select>
+</div>
+<div className="flex flex-col gap-1 w-full sm:w-40">
+<label className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">Month</label>
+<input value={periodMonth} onChange={(e) => setPeriodMonth(e.target.value)} type="month" className="w-full bg-surface-container-low px-3 py-2 rounded-lg font-body-md text-body-md text-on-surface outline-none focus:bg-surface-container-lowest shadow-sm"/>
+</div>
+<div className="flex flex-col gap-1 w-full sm:w-40">
+<label className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">Limit (INR)</label>
+<input value={limitAmount} onChange={(e) => setLimitAmount(e.target.value)} type="number" min="1" step="0.01" placeholder="5000" className="w-full bg-surface-container-low px-3 py-2 rounded-lg font-numeric-md text-numeric-md text-on-surface outline-none focus:bg-surface-container-lowest shadow-sm"/>
+</div>
+<button disabled={creating} type="submit" className="px-space-md py-2 rounded-lg bg-primary-container text-on-primary font-label-md text-label-md hover:bg-primary transition-colors shadow-sm disabled:opacity-60 w-full sm:w-auto">
+{creating ? 'Creating…' : 'Create'}
+</button>
+{createError && <p role="alert" className="font-body-sm text-body-sm text-error basis-full">{createError}</p>}
+</form>
+)}
 {/*  3-Column / 2-Column Responsive Card Grid  */}
 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter-desktop">
-{/*  Card 1: Housing & Rent  */}
-<div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between hover:shadow-md transition-all duration-150">
+{loading && (
+<p className="font-body-md text-body-md text-on-surface-variant col-span-full">Loading budgets…</p>
+)}
+{!loading && error && (
+<p className="font-body-md text-body-md text-error col-span-full">{error}</p>
+)}
+{!loading && !error && budgets.length === 0 && (
+<p className="font-body-md text-body-md text-on-surface-variant col-span-full">No budgets set for this month yet. Create one above.</p>
+)}
+{!loading && !error && budgets.map((b) => {
+  const pct = Number(b.progress_pct);
+  const breached = pct >= 100;
+  const warning = !breached && pct >= 80;
+  const barColor = breached ? 'bg-error' : warning ? 'bg-on-tertiary-container' : 'bg-secondary';
+  const badgeClass = breached
+    ? 'bg-error-container text-error'
+    : warning
+    ? 'bg-tertiary-fixed text-on-tertiary-fixed-variant'
+    : 'bg-secondary/10 text-secondary';
+  const badgeLabel = breached ? `${pct.toFixed(1)}% Breached` : warning ? `${pct.toFixed(1)}% Guardrail` : `${pct.toFixed(1)}% Healthy`;
+  return (
+    <div key={b.budget_id} className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between hover:shadow-md transition-all duration-150">
 <div>
 <div className="flex items-start justify-between mb-3">
 <div className="flex items-center gap-2.5">
 <div className="w-9 h-9 rounded-lg bg-surface-container-high flex items-center justify-center text-primary-container">
-<span className="material-symbols-outlined text-[20px]">apartment</span>
+<span className="material-symbols-outlined text-[20px]">savings</span>
 </div>
 <div className="flex flex-col">
-<span className="font-headline-sm text-headline-sm text-on-surface leading-tight">Housing &amp; Rent</span>
-<span className="font-label-sm text-label-sm text-outline">Fixed Standing Order</span>
+<span className="font-headline-sm text-headline-sm text-on-surface leading-tight">{b.category_name}</span>
+<span className="font-label-sm text-label-sm text-outline">{b.period_month}</span>
 </div>
 </div>
-<span className="px-2 py-0.5 rounded text-[10px] uppercase font-semibold tracking-wider bg-surface-container-high text-on-surface-variant">
-              100% Locked
-            </span>
+<span className={`px-2 py-0.5 rounded text-[10px] uppercase font-semibold tracking-wider ${badgeClass}`}>
+{badgeLabel}
+</span>
 </div>
 <div className="flex items-baseline justify-between pt-1">
 <div className="flex flex-col">
 <span className="font-label-sm text-label-sm text-outline">Disbursed</span>
-<span className="font-numeric-lg text-numeric-lg font-semibold text-on-surface">₹22,000</span>
+<span className="font-numeric-lg text-numeric-lg font-semibold text-on-surface">{formatCurrency(b.spent)}</span>
 </div>
 <div className="flex flex-col items-end">
 <span className="font-label-sm text-label-sm text-outline">Cap Limit</span>
-<span className="font-numeric-md text-numeric-md text-on-surface-variant font-medium">₹22,000</span>
+<span className="font-numeric-md text-numeric-md text-on-surface-variant font-medium">{formatCurrency(b.limit_amount)}</span>
 </div>
 </div>
-{/*  Neutral Progress Bar (100% full, standard expected commitment)  */}
 <div className="w-full h-2 bg-surface-container-high rounded-full overflow-hidden mt-3 mb-2">
-<div className="bg-primary-container h-full rounded-full" style={{ width: "100%" }}></div>
+<div className={`${barColor} h-full rounded-full transition-all duration-500`} style={{ width: `${Math.min(100, pct)}%` }}></div>
 </div>
 </div>
 <div className="pt-3 border-t border-surface-container-high flex items-center justify-between text-on-surface-variant">
 <div className="flex items-center gap-1.5">
-<span className="material-symbols-outlined text-[16px] text-secondary">check_circle</span>
-<span className="font-label-sm text-label-sm font-medium">On track • No alerts</span>
-</div>
-<span className="font-numeric-sm text-numeric-sm text-outline">Trx #2049</span>
-</div>
-</div>
-{/*  Card 2: Groceries & Essentials  */}
-<div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between hover:shadow-md transition-all duration-150">
-<div>
-<div className="flex items-start justify-between mb-3">
-<div className="flex items-center gap-2.5">
-<div className="w-9 h-9 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
-<span className="material-symbols-outlined text-[20px]">local_grocery_store</span>
-</div>
-<div className="flex flex-col">
-<span className="font-headline-sm text-headline-sm text-on-surface leading-tight">Groceries &amp; Essentials</span>
-<span className="font-label-sm text-label-sm text-outline">Variable Merchant Spend</span>
+<span className={`material-symbols-outlined text-[16px] ${breached ? 'text-error' : 'text-secondary'}`}>{breached ? 'warning' : 'check_circle'}</span>
+<span className="font-label-sm text-label-sm font-medium">
+{breached ? `Over by ${formatCurrency(b.spent - b.limit_amount)}` : `Remaining: ${formatCurrency(b.limit_amount - b.spent)}`}
+</span>
 </div>
 </div>
-<span className="px-2 py-0.5 rounded text-[10px] uppercase font-semibold tracking-wider bg-secondary/10 text-secondary">
-              81.7% Healthy
-            </span>
 </div>
-<div className="flex items-baseline justify-between pt-1">
-<div className="flex flex-col">
-<span className="font-label-sm text-label-sm text-outline">Disbursed</span>
-<span className="font-numeric-lg text-numeric-lg font-semibold text-on-surface">₹9,800</span>
-</div>
-<div className="flex flex-col items-end">
-<span className="font-label-sm text-label-sm text-outline">Cap Limit</span>
-<span className="font-numeric-md text-numeric-md text-on-surface-variant font-medium">₹12,000</span>
-</div>
-</div>
-{/*  Green Progress Bar  */}
-<div className="w-full h-2 bg-surface-container-high rounded-full overflow-hidden mt-3 mb-2">
-<div className="bg-secondary h-full rounded-full transition-all duration-500" style={{ width: "81.7%" }}></div>
-</div>
-</div>
-<div className="pt-3 border-t border-surface-container-high flex items-center justify-between text-on-surface-variant">
-<div className="flex items-center gap-1.5">
-<span className="font-label-sm text-label-sm font-semibold text-secondary">Remaining: ₹2,200</span>
-<span className="font-label-sm text-label-sm text-outline">(7 days left)</span>
-</div>
-<span className="font-numeric-sm text-numeric-sm text-outline">Run-rate: ₹314/d</span>
-</div>
-</div>
-{/*  Card 3: Dining & Takeout  */}
-<div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between hover:shadow-md transition-all duration-150">
-<div>
-<div className="flex items-start justify-between mb-3">
-<div className="flex items-center gap-2.5">
-<div className="w-9 h-9 rounded-lg bg-surface-container-high flex items-center justify-center text-on-tertiary-container">
-<span className="material-symbols-outlined text-[20px]">restaurant</span>
-</div>
-<div className="flex flex-col">
-<span className="font-headline-sm text-headline-sm text-on-surface leading-tight">Dining &amp; Takeout</span>
-<span className="font-label-sm text-label-sm text-outline">Discretionary Culinary</span>
-</div>
-</div>
-<span className="px-2 py-0.5 rounded text-[10px] uppercase font-semibold tracking-wider bg-tertiary-fixed text-on-tertiary-fixed-variant">
-              92.1% Guardrail
-            </span>
-</div>
-<div className="flex items-baseline justify-between pt-1">
-<div className="flex flex-col">
-<span className="font-label-sm text-label-sm text-outline">Disbursed</span>
-<span className="font-numeric-lg text-numeric-lg font-semibold text-on-surface">₹6,450</span>
-</div>
-<div className="flex flex-col items-end">
-<span className="font-label-sm text-label-sm text-outline">Cap Limit</span>
-<span className="font-numeric-md text-numeric-md text-on-surface-variant font-medium">₹7,000</span>
-</div>
-</div>
-{/*  Amber Progress Bar  */}
-<div className="w-full h-2 bg-surface-container-high rounded-full overflow-hidden mt-3 mb-2">
-<div className="bg-on-tertiary-container h-full rounded-full transition-all duration-500" style={{ width: "92.1%" }}></div>
-</div>
-</div>
-<div className="pt-3 border-t border-surface-container-high flex items-center justify-between text-on-surface-variant">
-<div className="flex items-center gap-1.5 text-on-tertiary-container">
-<span className="material-symbols-outlined text-[16px]">warning</span>
-<span className="font-label-sm text-label-sm font-semibold">90% Trigger: Notified 21 Oct</span>
-</div>
-<span className="font-numeric-sm text-numeric-sm text-outline">Buffer ₹550</span>
-</div>
-</div>
-{/*  Card 4: Utilities & Bills  */}
-<div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between hover:shadow-md transition-all duration-150">
-<div>
-<div className="flex items-start justify-between mb-3">
-<div className="flex items-center gap-2.5">
-<div className="w-9 h-9 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
-<span className="material-symbols-outlined text-[20px]">bolt</span>
-</div>
-<div className="flex flex-col">
-<span className="font-headline-sm text-headline-sm text-on-surface leading-tight">Utilities &amp; Bills</span>
-<span className="font-label-sm text-label-sm text-outline">Fixed Recurring Bills</span>
-</div>
-</div>
-<span className="px-2 py-0.5 rounded text-[10px] uppercase font-semibold tracking-wider bg-secondary/10 text-secondary">
-              84.3% Healthy
-            </span>
-</div>
-<div className="flex items-baseline justify-between pt-1">
-<div className="flex flex-col">
-<span className="font-label-sm text-label-sm text-outline">Disbursed</span>
-<span className="font-numeric-lg text-numeric-lg font-semibold text-on-surface">₹4,640</span>
-</div>
-<div className="flex flex-col items-end">
-<span className="font-label-sm text-label-sm text-outline">Cap Limit</span>
-<span className="font-numeric-md text-numeric-md text-on-surface-variant font-medium">₹5,500</span>
-</div>
-</div>
-{/*  Green Progress Bar  */}
-<div className="w-full h-2 bg-surface-container-high rounded-full overflow-hidden mt-3 mb-2">
-<div className="bg-secondary h-full rounded-full transition-all duration-500" style={{ width: "84.3%" }}></div>
-</div>
-</div>
-<div className="pt-3 border-t border-surface-container-high flex items-center justify-between text-on-surface-variant">
-<div className="flex items-center gap-1.5">
-<span className="material-symbols-outlined text-[16px] text-secondary">done_all</span>
-<span className="font-label-sm text-label-sm font-medium">Remaining: ₹860</span>
-</div>
-<span className="font-numeric-sm text-numeric-sm text-outline">Wifi • Power</span>
-</div>
-</div>
-{/*  Card 5: Entertainment & Leisure (CRIMSON WARNING CARD)  */}
-<div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between hover:shadow-md transition-all duration-150 lg:col-span-2">
-<div>
-<div className="flex items-start justify-between mb-3">
-<div className="flex items-center gap-2.5">
-<div className="w-9 h-9 rounded-lg bg-error-container flex items-center justify-center text-error">
-<span className="material-symbols-outlined text-[20px]">movie</span>
-</div>
-<div className="flex flex-col">
-<div className="flex items-center gap-2">
-<span className="font-headline-sm text-headline-sm text-on-surface leading-tight">Entertainment &amp; Leisure</span>
-<span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider bg-error-container text-error">
-                    103.3% Breached
-                  </span>
-</div>
-<span className="font-label-sm text-label-sm text-outline">Cinema, Events &amp; Streaming Platforms</span>
-</div>
-</div>
-<div className="hidden sm:flex items-center gap-1.5 bg-error-container/50 px-2.5 py-1 rounded text-error">
-<span className="material-symbols-outlined text-[16px]">priority_high</span>
-<span className="font-label-sm text-label-sm font-semibold">Logged Notification #104</span>
-</div>
-</div>
-<div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-<div className="flex flex-col">
-<span className="font-label-sm text-label-sm text-outline">Actual Disbursed</span>
-<span className="font-numeric-lg text-numeric-lg font-semibold text-error">₹3,100</span>
-</div>
-<div className="flex flex-col">
-<span className="font-label-sm text-label-sm text-outline">Authorised Cap</span>
-<span className="font-numeric-lg text-numeric-lg font-semibold text-on-surface">₹3,000</span>
-</div>
-<div className="flex flex-col">
-<span className="font-label-sm text-label-sm text-outline">Variance Deficit</span>
-<span className="font-numeric-lg text-numeric-lg font-semibold text-error">+₹100 (Overage)</span>
-</div>
-</div>
-{/*  Crimson Bar  */}
-<div className="w-full h-2 bg-surface-container-high rounded-full overflow-hidden mt-3 mb-2">
-<div className="bg-error h-full rounded-full transition-all duration-500" style={{ width: "100%" }}></div>
-</div>
-</div>
-<div className="pt-3 border-t border-surface-container-high flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-on-surface-variant">
-<div className="flex items-center gap-2">
-<span className="w-1.5 h-1.5 rounded-full bg-error animate-pulse"></span>
-<span className="font-body-sm text-body-sm text-error font-medium">
-              Exceeded by ₹100. Database trigger <code className="bg-surface-container px-1 py-0.5 rounded text-on-surface font-mono text-[11px]">trg_after_transaction_insert</code> executed.
-            </span>
-</div>
-<button className="font-label-sm text-label-sm font-semibold text-primary-container hover:underline self-start sm:self-auto">
-            Audit Ledger Delta →
-          </button>
-</div>
-</div>
+  );
+})}
 </div>
 </div>
 {/*  SECTION 2: Savings Goals & Milestones  */}
