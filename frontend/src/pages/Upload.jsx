@@ -1,6 +1,52 @@
-import React from 'react';
+import React, { useState } from 'react';
+import apiClient from '../api/client';
 
 export default function Upload() {
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+
+  const handleFileChange = (e) => {
+    setResult(null);
+    setError('');
+    setSelectedFile(e.target.files[0] || null);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setResult(null);
+    setError('');
+    const file = e.dataTransfer.files?.[0];
+    if (file) setSelectedFile(file);
+  };
+
+  const handleReset = () => {
+    setSelectedFile(null);
+    setResult(null);
+    setError('');
+  };
+
+  const handleParse = async () => {
+    if (!selectedFile) {
+      setError('Choose a CSV file first.');
+      return;
+    }
+    setError('');
+    setResult(null);
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      const response = await apiClient.post('/upload/csv', formData);
+      setResult(response.data);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="w-full h-full px-margin-desktop flex items-center justify-between"><div className="flex items-center gap-space-lg"><div className="flex items-center gap-space-sm"><img alt="Brand logo. - Primary color: #0b1f3a
@@ -71,7 +117,7 @@ export default function Upload() {
 </div>
 </div>
 {/*  Drag and drop zone with interactive styling  */}
-<div className="relative group my-space-xs rounded-xl p-space-xl bg-surface-container-low/60 hover:bg-surface-container-low transition-all cursor-pointer flex flex-col items-center justify-center text-center" id="drop-zone">
+<div onDragOver={(e) => e.preventDefault()} onDrop={handleDrop} className="relative group my-space-xs rounded-xl p-space-xl bg-surface-container-low/60 hover:bg-surface-container-low transition-all cursor-pointer flex flex-col items-center justify-center text-center" id="drop-zone">
 {/*  SVG Graphic: Statement parsing visualization  */}
 <div className="w-16 h-16 rounded-xl bg-primary-container flex items-center justify-center text-on-primary shadow-sm mb-space-md group-hover:scale-105 transition-transform">
 <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24">
@@ -79,9 +125,13 @@ export default function Upload() {
 </svg>
 </div>
 <div className="flex flex-col gap-1 max-w-md">
+{selectedFile ? (
+<p className="font-headline-sm text-headline-sm text-primary-container font-medium">{selectedFile.name}</p>
+) : (
 <p className="font-headline-sm text-headline-sm text-primary-container font-medium">
             Drag and drop statement here, or <span className="text-secondary underline decoration-secondary/40 underline-offset-2">browse filesystem</span>
 </p>
+)}
 <p className="font-body-sm text-body-sm text-on-surface-variant">
             Supported schema payload: <strong className="text-on-surface">.csv</strong> (Strict UTF-8 encoding, CRLF / LF line terminations, max 15MB)
           </p>
@@ -100,8 +150,25 @@ export default function Upload() {
 <span className="material-symbols-outlined text-[14px] text-secondary">verified</span> Axis / Kotak
           </span>
 </div>
-<input accept=".csv" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" id="statement-file-input" type="file"/>
+<input onChange={handleFileChange} accept=".csv" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" id="statement-file-input" type="file"/>
 </div>
+{error && (
+<p role="alert" className="font-body-sm text-body-sm text-error px-1">{error}</p>
+)}
+{result && (
+<div className="flex flex-col gap-1 px-space-md py-space-sm rounded-lg bg-secondary-container text-on-secondary-container">
+<span className="font-label-md text-label-md font-semibold">
+              Processed: {result.insertedCount} inserted, {result.failedCount} failed
+            </span>
+{result.errors?.length > 0 && (
+<ul className="font-body-sm text-body-sm list-disc pl-space-md">
+{result.errors.map((e) => (
+<li key={e.row}>Row {e.row}: {e.reason}</li>
+))}
+</ul>
+)}
+</div>
+)}
 {/*  Footer action bar in staging  */}
 <div className="flex flex-col sm:flex-row items-center justify-between gap-space-md pt-space-md mt-space-xs">
 <div className="flex items-center gap-space-xs text-on-surface-variant">
@@ -109,12 +176,12 @@ export default function Upload() {
 <span className="font-label-sm text-label-sm">Client-side sanitization prior to multipart transmission</span>
 </div>
 <div className="flex items-center gap-space-sm w-full sm:w-auto">
-<button className="flex-1 sm:flex-none px-space-md py-2 rounded-lg bg-surface-container-high text-primary-container font-label-md text-label-md hover:bg-surface-container transition-colors" type="button">
+<button onClick={handleReset} disabled={uploading} className="flex-1 sm:flex-none px-space-md py-2 rounded-lg bg-surface-container-high text-primary-container font-label-md text-label-md hover:bg-surface-container transition-colors disabled:opacity-60" type="button">
             Reset Staging
           </button>
-<button className="flex-1 sm:flex-none px-space-lg py-2 rounded-lg bg-primary-container text-on-primary font-label-md text-label-md font-semibold hover:bg-on-primary-fixed-variant shadow-sm transition-all flex items-center justify-center gap-space-xs" type="button">
+<button onClick={handleParse} disabled={uploading} className="flex-1 sm:flex-none px-space-lg py-2 rounded-lg bg-primary-container text-on-primary font-label-md text-label-md font-semibold hover:bg-on-primary-fixed-variant shadow-sm transition-all flex items-center justify-center gap-space-xs disabled:opacity-60" type="button">
 <span className="material-symbols-outlined text-[18px]">play_arrow</span>
-<span>Parse &amp; Normalize</span>
+<span>{uploading ? 'Processing…' : 'Parse & Normalize'}</span>
 </button>
 </div>
 </div>

@@ -1,12 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import apiClient from '../api/client';
+import { setSession } from '../api/auth';
 
 export default function Login() {
   const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    navigate('/dashboard');
+    setError('');
+    setLoading(true);
+    try {
+      const response = await apiClient.post('/auth/login', { email, password });
+      setSession(response.data.token, response.data.user);
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Unable to sign in. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -40,7 +56,7 @@ export default function Login() {
 <span className="material-symbols-outlined absolute left-3 text-outline text-[18px] pointer-events-none select-none">
               alternate_email
             </span>
-<input autocomplete="email" className="w-full pl-9 pr-3.5 py-2 text-on-surface bg-surface-container-lowest rounded-DEFAULT font-body-md text-body-md shadow-sm placeholder:text-outline/60 focus:outline-none focus:bg-surface-container-lowest transition-colors" id="emailInput"   placeholder="arjun.patel@example.com" required="" style={{ outline: "1px solid #c4c6ce;" }} type="email"/>
+<input autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-9 pr-3.5 py-2 text-on-surface bg-surface-container-lowest rounded-DEFAULT font-body-md text-body-md shadow-sm placeholder:text-outline/60 focus:outline-none focus:bg-surface-container-lowest transition-colors" id="emailInput"   placeholder="arjun.patel@example.com" required style={{ outline: "1px solid #c4c6ce;" }} type="email"/>
 </div>
 </div>
 <div className="flex flex-col gap-1.5">
@@ -56,7 +72,7 @@ export default function Login() {
 <span className="material-symbols-outlined absolute left-3 text-outline text-[18px] pointer-events-none select-none">
               lock
             </span>
-<input autocomplete="current-password" className="w-full pl-9 pr-10 py-2 text-on-surface bg-surface-container-lowest rounded-DEFAULT font-numeric-md text-numeric-md shadow-sm placeholder:text-outline/60 focus:outline-none focus:bg-surface-container-lowest transition-colors tracking-widest" id="passwordInput"   placeholder="••••••••••••" required="" style={{ outline: "1px solid #c4c6ce;" }} type="password"/>
+<input autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-9 pr-10 py-2 text-on-surface bg-surface-container-lowest rounded-DEFAULT font-numeric-md text-numeric-md shadow-sm placeholder:text-outline/60 focus:outline-none focus:bg-surface-container-lowest transition-colors tracking-widest" id="passwordInput"   placeholder="••••••••••••" required style={{ outline: "1px solid #c4c6ce;" }} type="password"/>
 <button aria-label="Toggle password visibility" className="absolute right-2.5 p-1 text-outline hover:text-on-surface rounded-DEFAULT focus:outline-none transition-colors" id="togglePasswordBtn"  type="button">
 <span className="material-symbols-outlined text-[18px] block" id="eyeIcon">visibility</span>
 </button>
@@ -72,12 +88,17 @@ export default function Login() {
           </span>
 </div>
 <div className="flex flex-col gap-2 pt-space-xs">
-<button className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-container text-on-primary rounded-DEFAULT font-label-md text-label-md tracking-wide hover:bg-primary transition-colors active:scale-[0.99] shadow-sm" id="submitBtn" type="submit">
+{error && (
+  <p role="alert" className="font-body-sm text-body-sm text-error px-1">{error}</p>
+)}
+<button disabled={loading} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-container text-on-primary rounded-DEFAULT font-label-md text-label-md tracking-wide hover:bg-primary transition-colors active:scale-[0.99] shadow-sm disabled:opacity-60" id="submitBtn" type="submit">
 <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
-<span>Sign In to Ledger</span>
-<span className="hidden material-symbols-outlined text-[16px] animate-spin" id="submitSpinner">
+<span>{loading ? 'Signing in…' : 'Sign In to Ledger'}</span>
+{loading && (
+<span className="material-symbols-outlined text-[16px] animate-spin" id="submitSpinner">
               progress_activity
             </span>
+)}
 </button>
 </div>
 </form>

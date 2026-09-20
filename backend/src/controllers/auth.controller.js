@@ -41,6 +41,14 @@ const register = async (req, res) => {
         [userId]
       );
 
+      // The frontend has no accounts UI/picker; give every new user one
+      // default account so the upload flow always has somewhere to attach
+      // transactions to without asking them to set one up first.
+      await connection.execute(
+        "INSERT INTO Accounts (user_id, account_name, account_type, currency_code) VALUES (?, 'Primary Account', 'bank', 'INR')",
+        [userId]
+      );
+
       await connection.commit();
     } catch (err) {
       await connection.rollback();

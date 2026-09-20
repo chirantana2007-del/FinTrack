@@ -8,19 +8,34 @@ const uploadCsv = async (req, res) => {
     return res.status(400).json({ message: "CSV file is required" });
   }
 
-  const { account_id: accountId } = req.body;
-  if (!accountId) {
-    return res.status(400).json({ message: "account_id is required" });
-  }
-
   const userId = req.user.id;
+  let accountId = req.body.account_id;
 
-  const [accounts] = await pool.execute(
-    "SELECT account_id FROM Accounts WHERE account_id = ? AND user_id = ?",
-    [accountId, userId]
-  );
-  if (accounts.length === 0) {
-    return res.status(404).json({ message: "Account not found" });
+  if (accountId) {
+    const [accounts] = await pool.execute(
+      "SELECT account_id FROM Accounts WHERE account_id = ? AND user_id = ?",
+      [accountId, userId]
+    );
+    if (accounts.length === 0) {
+      return res.status(404).json({ message: "Account not found" });
+    }
+  } else {
+    // No account_id supplied (the frontend has no account picker) — fall
+    // back to the user's oldest active account, creating one if somehow
+    // they don't have one yet (e.g. registered before this default existed).
+    const [accounts] = await pool.execute(
+      "SELECT account_id FROM Accounts WHERE user_id = ? AND is_active = 1 ORDER BY created_at ASC LIMIT 1",
+      [userId]
+    );
+    if (accounts.length > 0) {
+      accountId = accounts[0].account_id;
+    } else {
+      const [created] = await pool.execute(
+        "INSERT INTO Accounts (user_id, account_name, account_type, currency_code) VALUES (?, 'Primary Account', 'bank', 'INR')",
+        [userId]
+      );
+      accountId = created.insertId;
+    }
   }
 
   let parsed;

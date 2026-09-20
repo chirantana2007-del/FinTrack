@@ -52,14 +52,38 @@ describe("CSV Upload", () => {
     expect(response.body.message).toBe("CSV file is required");
   });
 
-  test("should reject request without account_id", async () => {
+  test("falls back to the user's default account when account_id is omitted", async () => {
+    const connection = {
+      beginTransaction: jest.fn().mockResolvedValue(),
+      commit: jest.fn().mockResolvedValue(),
+      rollback: jest.fn().mockResolvedValue(),
+      release: jest.fn(),
+      execute: sqlMock([
+        ["FROM Merchants WHERE canonical_name", () => [[]]],
+        ["INSERT INTO Merchants", () => [{ insertId: 10 }]],
+        ["FROM CategoryRules", () => [[]]],
+        ["INSERT INTO Transactions", () => [{ insertId: 1 }]]
+      ]),
+      query: sqlMock([
+        ["SELECT merchant_id, canonical_name", () => [[]]],
+        ["fn_categorize_transaction", () => [[{ category_id: null }]]]
+      ])
+    };
+
+    pool.execute = sqlMock([
+      ["FROM Accounts WHERE user_id = ? AND is_active", () => [[{ account_id: 3 }]]],
+      ["INSERT INTO UploadedFiles", () => [{ insertId: 42 }]],
+      ["UPDATE UploadedFiles", () => [{}]]
+    ]);
+    pool.getConnection.mockResolvedValue(connection);
+
     const response = await request(app)
       .post("/api/upload/csv")
       .set("Authorization", `Bearer ${token}`)
       .attach("file", Buffer.from("transaction_date,description,amount\n2026-01-01,TEST,500"), "test.csv");
 
-    expect(response.status).toBe(400);
-    expect(response.body.message).toBe("account_id is required");
+    expect(response.status).toBe(200);
+    expect(response.body.insertedCount).toBe(1);
   });
 
   test("should reject an account that doesn't belong to the user", async () => {
