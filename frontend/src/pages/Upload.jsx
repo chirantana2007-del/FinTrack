@@ -158,7 +158,7 @@ export default function Upload() {
 {result && (
 <div className="flex flex-col gap-1 px-space-md py-space-sm rounded-lg bg-secondary-container text-on-secondary-container">
 <span className="font-label-md text-label-md font-semibold">
-              Processed: {result.insertedCount} inserted, {result.failedCount} failed
+              Processed: {result.insertedCount} inserted, {result.duplicateCount > 0 ? `${result.duplicateCount} duplicate (skipped), ` : ''}{result.failedCount} failed
             </span>
 {result.errors?.length > 0 && (
 <ul className="font-body-sm text-body-sm list-disc pl-space-md">

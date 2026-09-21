@@ -73,6 +73,7 @@ describe("CSV Upload", () => {
     pool.execute = sqlMock([
       ["FROM Accounts WHERE user_id = ? AND is_active", () => [[{ account_id: 3 }]]],
       ["INSERT INTO UploadedFiles", () => [{ insertId: 42 }]],
+      ["SELECT transaction_date, description, amount FROM Transactions", () => [[]]],
       ["UPDATE UploadedFiles", () => [{}]]
     ]);
     pool.getConnection.mockResolvedValue(connection);
@@ -119,6 +120,7 @@ describe("CSV Upload", () => {
     pool.execute = sqlMock([
       ["FROM Accounts", () => [[{ account_id: 5 }]]],
       ["INSERT INTO UploadedFiles", () => [{ insertId: 42 }]],
+      ["SELECT transaction_date, description, amount FROM Transactions", () => [[]]],
       ["UPDATE UploadedFiles", () => [{}]]
     ]);
     pool.getConnection.mockResolvedValue(connection);
@@ -161,6 +163,7 @@ describe("CSV Upload", () => {
     pool.execute = sqlMock([
       ["FROM Accounts", () => [[{ account_id: 5 }]]],
       ["INSERT INTO UploadedFiles", () => [{ insertId: 42 }]],
+      ["SELECT transaction_date, description, amount FROM Transactions", () => [[]]],
       ["UPDATE UploadedFiles", () => [{}]]
     ]);
     pool.getConnection.mockResolvedValue(connection);
@@ -179,6 +182,54 @@ not-a-date,BAD ROW,abc`;
     expect(response.body.insertedCount).toBe(1);
     expect(response.body.failedCount).toBe(1);
     expect(response.body.errors[0].row).toBe(3);
+  });
+
+  test("skips rows that already exist for the account (re-uploading the same statement)", async () => {
+    const connection = {
+      beginTransaction: jest.fn().mockResolvedValue(),
+      commit: jest.fn().mockResolvedValue(),
+      rollback: jest.fn().mockResolvedValue(),
+      release: jest.fn(),
+      execute: sqlMock([
+        ["FROM Merchants WHERE canonical_name", () => [[]]],
+        ["INSERT INTO Merchants", () => [{ insertId: 10 }]],
+        ["FROM CategoryRules", () => [[]]],
+        ["INSERT INTO Transactions", () => [{ insertId: 1 }]]
+      ]),
+      query: sqlMock([
+        ["SELECT merchant_id, canonical_name", () => [[]]],
+        ["fn_categorize_transaction", () => [[{ category_id: null }]]]
+      ])
+    };
+
+    pool.execute = sqlMock([
+      ["FROM Accounts", () => [[{ account_id: 5 }]]],
+      ["INSERT INTO UploadedFiles", () => [{ insertId: 42 }]],
+      // TEST STORE / 500 on 2026-01-01 already exists for this account
+      ["SELECT transaction_date, description, amount FROM Transactions", () => [
+        [{ transaction_date: "2026-01-01", description: "TEST STORE", amount: 500 }]
+      ]],
+      ["UPDATE UploadedFiles", () => [{}]]
+    ]);
+    pool.getConnection.mockResolvedValue(connection);
+
+    const csv = `transaction_date,description,amount
+2026-01-01,TEST STORE,500
+2026-01-02,NEW ROW,150`;
+
+    const response = await request(app)
+      .post("/api/upload/csv")
+      .set("Authorization", `Bearer ${token}`)
+      .field("account_id", "5")
+      .attach("file", Buffer.from(csv), "test.csv");
+
+    expect(response.status).toBe(200);
+    expect(response.body.insertedCount).toBe(1);
+    expect(response.body.duplicateCount).toBe(1);
+    expect(connection.execute).not.toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO Transactions"),
+      expect.arrayContaining(["TEST STORE"])
+    );
   });
 
   test("should roll back to zero rows if the DB transaction fails partway", async () => {
@@ -203,6 +254,7 @@ not-a-date,BAD ROW,abc`;
     pool.execute = sqlMock([
       ["FROM Accounts", () => [[{ account_id: 5 }]]],
       ["INSERT INTO UploadedFiles", () => [{ insertId: 42 }]],
+      ["SELECT transaction_date, description, amount FROM Transactions", () => [[]]],
       ["UPDATE UploadedFiles", () => [{}]]
     ]);
     pool.getConnection.mockResolvedValue(connection);

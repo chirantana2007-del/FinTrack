@@ -54,11 +54,33 @@ const uploadCsv = async (req, res) => {
   );
   const uploadedFileId = uploadResult.insertId;
 
+  // Re-uploading the same statement (by mistake, or a browser double-click)
+  // would otherwise re-insert every row again with no way to tell they're
+  // the same transactions. Treat (date, description, amount) on the same
+  // account as the identity of a transaction for dedup purposes, and skip
+  // rows that already exist — both against what's already in the DB and
+  // against repeats within this same file.
+  const [existingRows] = await pool.execute(
+    "SELECT transaction_date, description, amount FROM Transactions WHERE account_id = ?",
+    [accountId]
+  );
+  const seenKeys = new Set(
+    existingRows.map((r) => `${r.transaction_date}|${r.description}|${Number(r.amount)}`)
+  );
+
   const connection = await pool.getConnection();
+  const duplicates = [];
   try {
     await connection.beginTransaction();
 
     for (const row of valid) {
+      const key = `${row.transaction_date}|${row.description}|${row.amount}`;
+      if (seenKeys.has(key)) {
+        duplicates.push(row);
+        continue;
+      }
+      seenKeys.add(key);
+
       const merchant = await resolveMerchant(row.description, connection);
       const { categoryId, needsReview } = await categorizeTransaction(
         row.description,
@@ -87,18 +109,21 @@ const uploadCsv = async (req, res) => {
 
     await connection.commit();
 
+    const insertedCount = valid.length - duplicates.length;
+
     await pool.execute(
       `UPDATE UploadedFiles
        SET status = 'completed', inserted_rows = ?, failed_rows = ?,
            error_log = ?, processed_at = NOW()
        WHERE file_id = ?`,
-      [valid.length, errors.length, errors.length > 0 ? JSON.stringify(errors) : null, uploadedFileId]
+      [insertedCount, errors.length, errors.length > 0 ? JSON.stringify(errors) : null, uploadedFileId]
     );
 
     return res.status(200).json({
       message: "Upload processed successfully",
       uploadedFileId,
-      insertedCount: valid.length,
+      insertedCount,
+      duplicateCount: duplicates.length,
       failedCount: errors.length,
       errors
     });
