@@ -1,47 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import apiClient from '../api/client';
+import re
+import os
 
-export default function Insights() {
-  const [predictionData, setPredictionData] = useState(null);
-  const [anomalies, setAnomalies] = useState([]);
-  const [nlQuery, setNlQuery] = useState('How much did I spend on Dining in October 2024?');
-  const [nlResult, setNlResult] = useState(null);
-  const [loadingNl, setLoadingNl] = useState(false);
+filepath = r'c:\Users\ADMIN\Desktop\fintrack\frontend\src\pages\Insights.jsx'
 
-  useEffect(() => {
-    // Fetch Predictions
-    apiClient.get('/insights/prediction').then(res => {
-      if (res.data.success) setPredictionData(res.data.predictions);
-    }).catch(console.error);
+with open(filepath, 'r', encoding='utf-8') as f:
+    content = f.read()
 
-    // Fetch Anomalies
-    apiClient.get('/insights/anomalies').then(res => {
-      if (res.data.success) setAnomalies(res.data.anomalies);
-    }).catch(console.error);
-  }, []);
+# We want to replace everything inside <main className="..."> ... </main>
+main_regex = re.compile(r'(<main[^>]*>)(.*?)(</main>)', re.DOTALL)
 
-  const handleNlSearch = async () => {
-    setLoadingNl(true);
-    try {
-      const res = await apiClient.post('/insights/nl-query', { query: nlQuery });
-      if (res.data.success) {
-        setNlResult(res.data.result);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingNl(false);
-    }
-  };
-
-  return (
-    <>
-      <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="w-full h-full px-margin-desktop flex items-center justify-between"><div className="flex items-center gap-space-lg"><div className="flex items-center gap-space-sm"><img alt="Brand logo. - Primary color: #0b1f3a
-- Font: newsreader
-- Mode: light
-- Roundness: rounded-sm
-" className="h-8 w-auto object-contain" src="/favicon.svg"/><div className="flex flex-col"><span className="font-headline-sm text-headline-sm font-semibold tracking-tight text-primary-container leading-none">FinTrack</span><span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mt-0.5">Personal Finance Analytics</span></div></div><div className="h-5 w-px bg-surface-variant hidden xl:block"></div><div className="hidden xl:flex items-center gap-space-xs px-space-sm py-0.5 rounded-lg bg-surface-container-low"><span className="material-symbols-outlined text-outline text-[16px]">lock</span><span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Audit Verified Ledger</span></div></div><div className="flex items-center gap-space-md"><div className="hidden sm:flex items-center gap-space-xs px-space-sm py-1 rounded-lg bg-surface-container-low text-on-surface"><span className="material-symbols-outlined text-outline text-[18px]">calendar_today</span><span className="font-label-md text-label-md font-semibold text-primary-container">Oct 2024</span><span className="w-1.5 h-1.5 rounded-full bg-secondary"></span></div><button onClick={() => alert("No new notifications")} aria-label="Budget Notifications" className="relative p-space-xs rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-on-surface" type="button"><span className="material-symbols-outlined text-[22px]">notifications</span><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface-container-lowest"></span></button><div className="h-6 w-px bg-surface-variant"></div><div className="flex items-center gap-space-sm pl-space-xs"><img alt="Profile" className="w-8 h-8 rounded-full object-cover ring-1 ring-outline-variant" src="https://ui-avatars.com/api/?name=Arjun+Patel&background=0b1f3a&color=fff"/><div className="hidden md:flex flex-col text-left"><span className="font-label-md text-label-md font-semibold text-on-surface leading-tight">Arjun Patel</span><span className="font-label-sm text-label-sm text-secondary font-medium">Standard Tier</span></div></div></div></div></header><aside className="fixed left-0 top-16 bottom-0 w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex flex-col justify-between pt-space-md pb-space-lg"><div className="px-space-sm flex flex-col gap-space-sm"><div className="px-space-sm pb-space-xs"><span className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">Ledger Navigation</span></div><nav className="flex flex-col gap-1" data-active-classes="bg-primary-container text-on-primary font-semibold rounded-lg shadow-sm"><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="dashboard" href="/dashboard"><span className="material-symbols-outlined text-[20px]">dashboard</span><span className="font-body-md text-body-md">Dashboard</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="transactions" href="/transactions"><span className="material-symbols-outlined text-[20px]">receipt_long</span><span className="font-body-md text-body-md">Transactions</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="upload" href="/upload"><span className="material-symbols-outlined text-[20px]">upload_file</span><span className="font-body-md text-body-md">Upload</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="budgets-goals" href="/budgets"><span className="material-symbols-outlined text-[20px]">savings</span><span className="font-body-md text-body-md">Budgets &amp; Goals</span></a><a aria-current="page" className="flex items-center gap-space-sm px-space-sm py-2 transition-colors bg-primary-container text-on-primary font-semibold rounded-lg shadow-sm" data-path="ai-insights" href="/insights"><span className="material-symbols-outlined text-[20px]">psychology</span><span className="font-body-md text-body-md">AI Insights</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="monthly-report" href="/report"><span className="material-symbols-outlined text-[20px]">summarize</span><span className="font-body-md text-body-md">Monthly Report</span></a></nav></div><div className="px-space-sm flex flex-col gap-space-xs pt-space-md bg-surface-container-lowest"><div className="h-px w-full bg-surface-variant mb-space-xs"></div><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="account" href="/login"><span className="material-symbols-outlined text-[20px]">manage_accounts</span><span className="font-body-md text-body-md">Login / Account</span></a><div className="mt-space-xs p-space-sm rounded-lg bg-surface-container-low flex flex-col gap-1"><div className="flex items-center justify-between"><span className="font-label-sm text-label-sm font-semibold uppercase text-outline">Monthly Cap</span><span className="font-numeric-sm text-numeric-sm font-semibold text-secondary">68%</span></div><div className="w-full h-1.5 bg-surface-variant rounded-full overflow-hidden"><div className="h-full bg-secondary rounded-full" style={{ width: "68%" }}></div></div><span className="font-label-sm text-label-sm text-on-surface-variant">₹68,450 of ₹100,000</span></div></div></aside><div className="pl-64"><main className="w-full pt-16 min-h-screen px-margin-desktop py-space-lg bg-background"><div className="flex flex-col w-full">
+new_main_content = """<div className="flex flex-col w-full">
 {/*  Sub-Header / Context Meta Strip  */}
 <div className="flex flex-col md:flex-row md:items-end justify-between pb-space-lg gap-space-sm">
   <div className="flex flex-col">
@@ -71,7 +39,6 @@ export default function Insights() {
           type="text" 
           value={nlQuery}
           onChange={(e) => setNlQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleNlSearch()}
         />
         <div className="absolute right-2 flex items-center gap-1">
           <button className="px-space-xs py-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high transition-colors font-label-sm text-label-sm" onClick={() => setNlQuery('')} type="button">Clear</button>
@@ -200,7 +167,11 @@ export default function Insights() {
     ))}
   </div>
 </section>
-</div></main></div>
-    </>
-  );
-}
+</div>"""
+
+updated_content = main_regex.sub(rf'\g<1>{new_main_content}\g<3>', content)
+
+with open(filepath, 'w', encoding='utf-8') as f:
+    f.write(updated_content)
+
+print("Insights UI dynamic mapping complete.")

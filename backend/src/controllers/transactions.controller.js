@@ -84,4 +84,86 @@ const listTransactions = async (req, res) => {
     return res.json({ transactions, total, page, limit });
 };
 
-module.exports = { listTransactions };
+const exportTransactions = async (req, res) => {
+    const {
+        account_id: accountId,
+        category_id: categoryId,
+        start_date: startDate,
+        end_date: endDate,
+        search,
+        min_amount: minAmount,
+        max_amount: maxAmount,
+        needs_review: needsReview
+    } = req.query;
+
+    const conditions = ["a.user_id = ?"];
+    const params = [req.user.id];
+
+    if (accountId) {
+        conditions.push("t.account_id = ?");
+        params.push(accountId);
+    }
+    if (categoryId) {
+        conditions.push("t.category_id = ?");
+        params.push(categoryId);
+    }
+    if (startDate) {
+        conditions.push("t.transaction_date >= ?");
+        params.push(startDate);
+    }
+    if (endDate) {
+        conditions.push("t.transaction_date <= ?");
+        params.push(endDate);
+    }
+    if (search) {
+        conditions.push("t.description LIKE ?");
+        params.push(`%${search}%`);
+    }
+    if (minAmount !== undefined) {
+        conditions.push("t.amount >= ?");
+        params.push(minAmount);
+    }
+    if (maxAmount !== undefined) {
+        conditions.push("t.amount <= ?");
+        params.push(maxAmount);
+    }
+    if (needsReview !== undefined) {
+        conditions.push("t.needs_review = ?");
+        params.push(needsReview === "true" || needsReview === "1" ? 1 : 0);
+    }
+
+    const whereClause = conditions.join(" AND ");
+
+    const [transactions] = await pool.query(
+        `SELECT t.transaction_id, t.transaction_date, t.description, t.amount,
+                t.needs_review, t.is_flagged_anomaly,
+                t.account_id, a.account_name,
+                t.category_id, c.name AS category_name,
+                t.merchant_id, m.canonical_name AS merchant_name
+         FROM Transactions t
+         JOIN Accounts a ON a.account_id = t.account_id
+         LEFT JOIN Categories c ON c.category_id = t.category_id
+         LEFT JOIN Merchants m ON m.merchant_id = t.merchant_id
+         WHERE ${whereClause}
+         ORDER BY t.transaction_date DESC, t.transaction_id DESC`,
+        params
+    );
+
+    let csv = "Date,Merchant/Description,Category,Account,Amount,Needs Review\n";
+    for (const t of transactions) {
+        const date = t.transaction_date ? t.transaction_date.toISOString().split('T')[0] : '';
+        const name = (t.merchant_name || t.description || '').replace(/"/g, '""');
+        const cat = (t.category_name || 'Uncategorized').replace(/"/g, '""');
+        const acc = (t.account_name || '').replace(/"/g, '""');
+        csv += `"${date}","${name}","${cat}","${acc}",${t.amount},${t.needs_review ? 'Yes' : 'No'}\n`;
+    }
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="Transactions_Export.csv"`
+    );
+    res.send(csv);
+};
+
+module.exports = { listTransactions, exportTransactions };

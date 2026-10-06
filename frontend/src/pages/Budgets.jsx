@@ -12,6 +12,7 @@ function formatCurrency(amount) {
 
 export default function Budgets() {
   const [budgets, setBudgets] = useState([]);
+  const [goals, setGoals] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -34,6 +35,7 @@ export default function Budgets() {
 
   useEffect(() => {
     loadBudgets();
+    apiClient.get('/goals').then(res => setGoals(res.data.data)).catch(console.error);
     apiClient.get('/categories').then((response) => {
       setCategories(response.data.categories.filter((c) => c.type === 'expense'));
     }).catch(() => {});
@@ -66,7 +68,7 @@ export default function Budgets() {
 - Font: newsreader
 - Mode: light
 - Roundness: rounded-sm
-" className="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1V71bkGGxdL_flU3BZgt-LW8zse4BuUfTTPEEngie2aJ8UMcBgNLO8tu8sHp4V6hpAKlj9EfPmofLtD12I7WKK9gThiOS5YLyO8XCd9msAMU8grbS-U40eAW_WTSQ6uU4w55DwJ2qjtgh7OSVOsHK9WFnZ843wn0_350cuiguCrdXaqQ2e_EKBeQXgV9vPHMrHa3XQTQ_oUWb2uEI5CzR3Jt15C4-zbeQBgsQbscOAWJOzzpFE_tsm1mGXy"/><div className="flex flex-col"><span className="font-headline-sm text-headline-sm font-semibold tracking-tight text-primary-container leading-none">FinTrack</span><span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mt-0.5">Personal Finance Analytics</span></div></div><div className="h-5 w-px bg-surface-variant hidden xl:block"></div><div className="hidden xl:flex items-center gap-space-xs px-space-sm py-0.5 rounded-lg bg-surface-container-low"><span className="material-symbols-outlined text-outline text-[16px]">lock</span><span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Audit Verified Ledger</span></div></div><div className="flex items-center gap-space-md"><div className="hidden sm:flex items-center gap-space-xs px-space-sm py-1 rounded-lg bg-surface-container-low text-on-surface"><span className="material-symbols-outlined text-outline text-[18px]">calendar_today</span><span className="font-label-md text-label-md font-semibold text-primary-container">Oct 2024</span><span className="w-1.5 h-1.5 rounded-full bg-secondary"></span></div><button onClick={() => alert("No new notifications")} aria-label="Budget Notifications" className="relative p-space-xs rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-on-surface" type="button"><span className="material-symbols-outlined text-[22px]">notifications</span><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface-container-lowest"></span></button><div className="h-6 w-px bg-surface-variant"></div><div className="flex items-center gap-space-sm pl-space-xs"><img alt="Profile" className="w-8 h-8 rounded-full object-cover ring-1 ring-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAiUVZ6t5iI-gkH3oQwhLRnaI-ZZcOKZbh6XJrMbATUZepl_j12Dd17Icr1532K6E0JB_qWjj4Yw5UTYx8iGFMZpaTEVHnZyPI2eIXhSTK1R3QzVrmV7ESqG_cSRyrfBuRG-OV5FkZvQOLAgjOgGcInARxYQqlp6n1PwQFRgzjNBeVMTLDAajEGiWQVNHpqq8mCfg51n-9i70ccueQ_fOO1lJAK8ooC8ioC2Z2RdjOyclKWhY3WtWkqHQ"/><div className="hidden md:flex flex-col text-left"><span className="font-label-md text-label-md font-semibold text-on-surface leading-tight">Arjun Patel</span><span className="font-label-sm text-label-sm text-secondary font-medium">Standard Tier</span></div></div></div></div></header><aside className="fixed left-0 top-16 bottom-0 w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex flex-col justify-between pt-space-md pb-space-lg"><div className="px-space-sm flex flex-col gap-space-sm"><div className="px-space-sm pb-space-xs"><span className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">Ledger Navigation</span></div><nav className="flex flex-col gap-1" data-active-classes="bg-primary-container text-on-primary font-semibold rounded-lg shadow-sm"><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="dashboard" href="/dashboard"><span className="material-symbols-outlined text-[20px]">dashboard</span><span className="font-body-md text-body-md">Dashboard</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="transactions" href="/transactions"><span className="material-symbols-outlined text-[20px]">receipt_long</span><span className="font-body-md text-body-md">Transactions</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="upload" href="/upload"><span className="material-symbols-outlined text-[20px]">upload_file</span><span className="font-body-md text-body-md">Upload</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="budgets-goals" href="/budgets"><span className="material-symbols-outlined text-[20px]">savings</span><span className="font-body-md text-body-md">Budgets &amp; Goals</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="ai-insights" href="/insights"><span className="material-symbols-outlined text-[20px]">psychology</span><span className="font-body-md text-body-md">AI Insights</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="monthly-report" href="/report"><span className="material-symbols-outlined text-[20px]">summarize</span><span className="font-body-md text-body-md">Monthly Report</span></a></nav></div><div className="px-space-sm flex flex-col gap-space-xs pt-space-md bg-surface-container-lowest"><div className="h-px w-full bg-surface-variant mb-space-xs"></div><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="account" href="/login"><span className="material-symbols-outlined text-[20px]">manage_accounts</span><span className="font-body-md text-body-md">Login / Account</span></a><div className="mt-space-xs p-space-sm rounded-lg bg-surface-container-low flex flex-col gap-1"><div className="flex items-center justify-between"><span className="font-label-sm text-label-sm font-semibold uppercase text-outline">Monthly Cap</span><span className="font-numeric-sm text-numeric-sm font-semibold text-secondary">68%</span></div><div className="w-full h-1.5 bg-surface-variant rounded-full overflow-hidden"><div className="h-full bg-secondary rounded-full" style={{ width: "68%" }}></div></div><span className="font-label-sm text-label-sm text-on-surface-variant">₹68,450 of ₹100,000</span></div></div></aside><div className="pl-64"><main className="w-full pt-16 min-h-screen px-margin-desktop py-space-lg bg-background"><div className="flex flex-col w-full">
+" className="h-8 w-auto object-contain" src="/favicon.svg"/><div className="flex flex-col"><span className="font-headline-sm text-headline-sm font-semibold tracking-tight text-primary-container leading-none">FinTrack</span><span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mt-0.5">Personal Finance Analytics</span></div></div><div className="h-5 w-px bg-surface-variant hidden xl:block"></div><div className="hidden xl:flex items-center gap-space-xs px-space-sm py-0.5 rounded-lg bg-surface-container-low"><span className="material-symbols-outlined text-outline text-[16px]">lock</span><span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Audit Verified Ledger</span></div></div><div className="flex items-center gap-space-md"><div className="hidden sm:flex items-center gap-space-xs px-space-sm py-1 rounded-lg bg-surface-container-low text-on-surface"><span className="material-symbols-outlined text-outline text-[18px]">calendar_today</span><span className="font-label-md text-label-md font-semibold text-primary-container">Oct 2024</span><span className="w-1.5 h-1.5 rounded-full bg-secondary"></span></div><button onClick={() => alert("No new notifications")} aria-label="Budget Notifications" className="relative p-space-xs rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-on-surface" type="button"><span className="material-symbols-outlined text-[22px]">notifications</span><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface-container-lowest"></span></button><div className="h-6 w-px bg-surface-variant"></div><div className="flex items-center gap-space-sm pl-space-xs"><img alt="Profile" className="w-8 h-8 rounded-full object-cover ring-1 ring-outline-variant" src="https://ui-avatars.com/api/?name=Arjun+Patel&background=0b1f3a&color=fff"/><div className="hidden md:flex flex-col text-left"><span className="font-label-md text-label-md font-semibold text-on-surface leading-tight">Arjun Patel</span><span className="font-label-sm text-label-sm text-secondary font-medium">Standard Tier</span></div></div></div></div></header><aside className="fixed left-0 top-16 bottom-0 w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex flex-col justify-between pt-space-md pb-space-lg"><div className="px-space-sm flex flex-col gap-space-sm"><div className="px-space-sm pb-space-xs"><span className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">Ledger Navigation</span></div><nav className="flex flex-col gap-1" data-active-classes="bg-primary-container text-on-primary font-semibold rounded-lg shadow-sm"><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="dashboard" href="/dashboard"><span className="material-symbols-outlined text-[20px]">dashboard</span><span className="font-body-md text-body-md">Dashboard</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="transactions" href="/transactions"><span className="material-symbols-outlined text-[20px]">receipt_long</span><span className="font-body-md text-body-md">Transactions</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="upload" href="/upload"><span className="material-symbols-outlined text-[20px]">upload_file</span><span className="font-body-md text-body-md">Upload</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="budgets-goals" href="/budgets"><span className="material-symbols-outlined text-[20px]">savings</span><span className="font-body-md text-body-md">Budgets &amp; Goals</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="ai-insights" href="/insights"><span className="material-symbols-outlined text-[20px]">psychology</span><span className="font-body-md text-body-md">AI Insights</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="monthly-report" href="/report"><span className="material-symbols-outlined text-[20px]">summarize</span><span className="font-body-md text-body-md">Monthly Report</span></a></nav></div><div className="px-space-sm flex flex-col gap-space-xs pt-space-md bg-surface-container-lowest"><div className="h-px w-full bg-surface-variant mb-space-xs"></div><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="account" href="/login"><span className="material-symbols-outlined text-[20px]">manage_accounts</span><span className="font-body-md text-body-md">Login / Account</span></a><div className="mt-space-xs p-space-sm rounded-lg bg-surface-container-low flex flex-col gap-1"><div className="flex items-center justify-between"><span className="font-label-sm text-label-sm font-semibold uppercase text-outline">Monthly Cap</span><span className="font-numeric-sm text-numeric-sm font-semibold text-secondary">68%</span></div><div className="w-full h-1.5 bg-surface-variant rounded-full overflow-hidden"><div className="h-full bg-secondary rounded-full" style={{ width: "68%" }}></div></div><span className="font-label-sm text-label-sm text-on-surface-variant">₹68,450 of ₹100,000</span></div></div></aside><div className="pl-64"><main className="w-full pt-16 min-h-screen px-margin-desktop py-space-lg bg-background"><div className="flex flex-col w-full">
 {/*  Interactive Modal Container (Hidden by default)  */}
 <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/40 backdrop-blur-sm hidden" id="create-modal">
 <div className="bg-surface-container-lowest rounded-xl shadow-xl w-full max-w-lg p-space-lg mx-4 flex flex-col gap-space-md">
@@ -208,7 +210,7 @@ export default function Budgets() {
 </div>
 {/*  Rich Illustration / Image Placeholder  */}
 <div className="relative z-10 mt-4 pt-4 border-t border-primary-fixed-variant/40 flex items-center gap-3">
-<img className="w-14 h-14 rounded-lg object-cover ring-1 ring-primary-fixed-variant" data-alt="An austere architectural close up of crisp sandstone government ministry and central bank ledger records, ambient high-contrast autumn daylight casting long shadows on clean classical stone pillars, muted navy and slate tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA4bPmLeBHZHRaBkEnZcrM2ccvRIWGiMvwbprjt8nKDKlChG38AEon3eNgpjxnE7pfpZBaVHauEWqS9up-DRzdWMS_cE183Z6iHktrEIPzLvspqDZN-ZQl3co9WbQ5KI06pBuj8uEJpFk5ODKjt5Slu9h6HxezJ26IRfMFaBmBMakj4PawzjnEset11hEIevR81rOhM_Em_cJ1eb5o2C6ixtcSaN8u-H1NQOj9gqQ8Mfzg5SOKnmAxT1Q"/>
+<img className="w-14 h-14 rounded-lg object-cover ring-1 ring-primary-fixed-variant" data-alt="An austere architectural close up of crisp sandstone government ministry and central bank ledger records, ambient high-contrast autumn daylight casting long shadows on clean classical stone pillars, muted navy and slate tones." src="https://ui-avatars.com/api/?name=Arjun+Patel&background=0b1f3a&color=fff"/>
 <div className="flex flex-col">
 <span className="font-label-md text-label-md font-semibold text-on-primary leading-tight">Ledger Safe Guard 2.4</span>
 <span className="font-label-sm text-label-sm text-primary-fixed-dim">Automated Rule Engine active</span>
@@ -332,161 +334,74 @@ export default function Budgets() {
 </div>
 {/*  Savings Goals Cards Bento  */}
 <div className="grid grid-cols-1 md:grid-cols-3 gap-gutter-desktop">
-{/*  Goal 1: Emergency Fund (6 Months Expenses)  */}
-<div className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col justify-between hover:shadow-md transition-all duration-150 relative overflow-hidden">
-<div className="flex flex-col gap-space-sm">
-<div className="flex items-start justify-between">
-<div className="flex flex-col">
-<span className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">Tier 1 Safeguard</span>
-<span className="font-headline-sm text-headline-sm text-on-surface font-semibold mt-0.5">Emergency Fund</span>
-<span className="font-body-sm text-body-sm text-on-surface-variant">6 Months Living Expenses</span>
-</div>
-{/*  Circular Progress SVG Meter (70%)  */}
-<div className="relative w-16 h-16 flex items-center justify-center">
-<svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-<path className="text-surface-container-high" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3.5"></path>
-<path className="text-secondary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="70, 100" strokeLinecap="round" strokeWidth="3.5"></path>
-</svg>
-<div className="absolute flex flex-col items-center justify-center">
-<span className="font-numeric-sm text-numeric-sm font-bold text-on-surface">70%</span>
-</div>
-</div>
-</div>
-{/*  Figures Breakdown  */}
-<div className="bg-surface-container-low p-space-sm rounded-lg flex flex-col gap-1 mt-2">
-<div className="flex justify-between items-baseline">
-<span className="font-label-sm text-label-sm text-outline">Accumulated:</span>
-<span className="font-numeric-lg text-numeric-lg font-bold text-secondary">₹2,10,000</span>
-</div>
-<div className="flex justify-between items-baseline">
-<span className="font-label-sm text-label-sm text-outline">Target Corpus:</span>
-<span className="font-numeric-md text-numeric-md text-on-surface font-semibold">₹3,00,000</span>
-</div>
-</div>
-{/*  Segmented Milestone Bar  */}
-<div className="flex flex-col gap-1">
-<div className="flex justify-between font-label-sm text-label-sm text-on-surface-variant">
-<span>Cadence: ₹15,000 / month</span>
-<span className="font-semibold text-primary-container">March 2025</span>
-</div>
-<div className="grid grid-cols-6 gap-1 h-2">
-<div className="bg-secondary rounded-sm"></div>
-<div className="bg-secondary rounded-sm"></div>
-<div className="bg-secondary rounded-sm"></div>
-<div className="bg-secondary rounded-sm"></div>
-<div className="bg-surface-container-high rounded-sm"></div>
-<div className="bg-surface-container-high rounded-sm"></div>
-</div>
-</div>
-</div>
-<div className="pt-4 mt-4 border-t border-surface-container-high flex items-center justify-between">
-<span className="font-label-sm text-label-sm text-secondary font-semibold flex items-center gap-1">
-<span className="w-2 h-2 rounded-full bg-secondary"></span>
-            6 Monthly Deposits Complete
-          </span>
-<button className="font-label-sm text-label-sm text-outline hover:text-on-surface">Settings</button>
-</div>
-</div>
-{/*  Goal 2: Goa Vacation & Travel  */}
-<div className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col justify-between hover:shadow-md transition-all duration-150 relative overflow-hidden">
-<div className="flex flex-col gap-space-sm">
-<div className="flex items-start justify-between">
-<div className="flex flex-col">
-<span className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">Short-Term Experience</span>
-<span className="font-headline-sm text-headline-sm text-on-surface font-semibold mt-0.5">Goa Vacation &amp; Travel</span>
-<span className="font-body-sm text-body-sm text-on-surface-variant">Year-end Retreat</span>
-</div>
-{/*  Circular Progress SVG Meter (71.1%)  */}
-<div className="relative w-16 h-16 flex items-center justify-center">
-<svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-<path className="text-surface-container-high" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3.5"></path>
-<path className="text-secondary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="71.1, 100" strokeLinecap="round" strokeWidth="3.5"></path>
-</svg>
-<div className="absolute flex flex-col items-center justify-center">
-<span className="font-numeric-sm text-numeric-sm font-bold text-on-surface">71.1%</span>
-</div>
-</div>
-</div>
-{/*  Figures Breakdown  */}
-<div className="bg-surface-container-low p-space-sm rounded-lg flex flex-col gap-1 mt-2">
-<div className="flex justify-between items-baseline">
-<span className="font-label-sm text-label-sm text-outline">Accumulated:</span>
-<span className="font-numeric-lg text-numeric-lg font-bold text-secondary">₹32,000</span>
-</div>
-<div className="flex justify-between items-baseline">
-<span className="font-label-sm text-label-sm text-outline">Target Corpus:</span>
-<span className="font-numeric-md text-numeric-md text-on-surface font-semibold">₹45,000</span>
-</div>
-</div>
-{/*  Segmented Milestone Bar  */}
-<div className="flex flex-col gap-1">
-<div className="flex justify-between font-label-sm text-label-sm text-on-surface-variant">
-<span>2 months left • Status: On track</span>
-<span className="font-semibold text-primary-container">Dec 2024</span>
-</div>
-<div className="w-full h-2 bg-surface-container-high rounded-full overflow-hidden">
-<div className="bg-secondary h-full rounded-full" style={{ width: "71.1%" }}></div>
-</div>
-</div>
-</div>
-<div className="pt-4 mt-4 border-t border-surface-container-high flex items-center justify-between">
-<span className="font-label-sm text-label-sm text-secondary font-semibold flex items-center gap-1">
-<span className="material-symbols-outlined text-[16px]">flight_takeoff</span>
-            On Track for Dec Execution
-          </span>
-<button className="font-label-sm text-label-sm text-outline hover:text-on-surface">Settings</button>
-</div>
-</div>
-{/*  Goal 3: New MacBook Pro M3  */}
-<div className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col justify-between hover:shadow-md transition-all duration-150 relative overflow-hidden">
-<div className="flex flex-col gap-space-sm">
-<div className="flex items-start justify-between">
-<div className="flex flex-col">
-<span className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">Capital Equipment</span>
-<span className="font-headline-sm text-headline-sm text-on-surface font-semibold mt-0.5">New MacBook Pro M3</span>
-<span className="font-body-sm text-body-sm text-on-surface-variant">Engineering Workstation</span>
-</div>
-{/*  Circular Progress SVG Meter (50.0%)  */}
-<div className="relative w-16 h-16 flex items-center justify-center">
-<svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-<path className="text-surface-container-high" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3.5"></path>
-<path className="text-primary-container" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="50, 100" strokeLinecap="round" strokeWidth="3.5"></path>
-</svg>
-<div className="absolute flex flex-col items-center justify-center">
-<span className="font-numeric-sm text-numeric-sm font-bold text-on-surface">50.0%</span>
-</div>
-</div>
-</div>
-{/*  Figures Breakdown  */}
-<div className="bg-surface-container-low p-space-sm rounded-lg flex flex-col gap-1 mt-2">
-<div className="flex justify-between items-baseline">
-<span className="font-label-sm text-label-sm text-outline">Accumulated:</span>
-<span className="font-numeric-lg text-numeric-lg font-bold text-primary-container">₹80,000</span>
-</div>
-<div className="flex justify-between items-baseline">
-<span className="font-label-sm text-label-sm text-outline">Target Corpus:</span>
-<span className="font-numeric-md text-numeric-md text-on-surface font-semibold">₹1,60,000</span>
-</div>
-</div>
-{/*  Segmented Milestone Bar  */}
-<div className="flex flex-col gap-1">
-<div className="flex justify-between font-label-sm text-label-sm text-on-surface-variant">
-<span>₹10,000 / mo recurring</span>
-<span className="font-semibold text-primary-container">July 2025</span>
-</div>
-<div className="w-full h-2 bg-surface-container-high rounded-full overflow-hidden">
-<div className="bg-primary-container h-full rounded-full" style={{ width: "50.0%" }}></div>
-</div>
-</div>
-</div>
-<div className="pt-4 mt-4 border-t border-surface-container-high flex items-center justify-between">
-<span className="font-label-sm text-label-sm text-on-surface-variant font-medium flex items-center gap-1">
-<span className="material-symbols-outlined text-[16px] text-outline">laptop_mac</span>
-            8 Months Remaining
-          </span>
-<button className="font-label-sm text-label-sm text-outline hover:text-on-surface">Settings</button>
-</div>
-</div>
+{goals.length === 0 ? (
+  <p className="font-body-md text-body-md text-on-surface-variant col-span-full">No savings goals created yet.</p>
+) : goals.map((goal, i) => {
+  const targetAmount = Number(goal.target_amount);
+  const currentAmount = Number(goal.current_amount);
+  const pct = targetAmount > 0 ? (currentAmount / targetAmount) * 100 : 0;
+  
+  let monthsLeftStr = '';
+  if (goal.target_date) {
+      const now = new Date();
+      const target = new Date(goal.target_date);
+      const diffTime = target - now;
+      if (diffTime > 0) {
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          const diffMonths = Math.round(diffDays / 30);
+          monthsLeftStr = diffMonths > 0 ? `${diffMonths} months left` : `${diffDays} days left`;
+      } else {
+          monthsLeftStr = 'Target date passed';
+      }
+  }
+  
+  const colors = ['text-secondary', 'text-primary-container', 'text-on-tertiary-container'];
+  const ringColors = ['bg-secondary', 'bg-primary-container', 'bg-on-tertiary-container'];
+  const color = colors[i % colors.length];
+  const ringColor = ringColors[i % ringColors.length];
+
+  return (
+    <div key={goal.id} className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col justify-between hover:shadow-md transition-all duration-150 relative overflow-hidden">
+      <div className="flex flex-col gap-space-sm">
+        <div className="flex items-start justify-between">
+          <div className="flex flex-col pr-2">
+            <span className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">Savings Milestone</span>
+            <span className="font-headline-sm text-headline-sm text-on-surface font-semibold mt-0.5 break-words">{goal.name}</span>
+            <span className="font-body-sm text-body-sm text-on-surface-variant capitalize">{goal.status}</span>
+          </div>
+          <div className="relative w-16 h-16 flex items-center justify-center shrink-0">
+            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+              <path className="text-surface-container-high" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3.5"></path>
+              <path className={color} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeDasharray={`${Math.min(100, pct)}, 100`} strokeLinecap="round" strokeWidth="3.5"></path>
+            </svg>
+            <div className="absolute flex flex-col items-center justify-center">
+              <span className="font-numeric-sm text-numeric-sm font-bold text-on-surface">{pct.toFixed(1)}%</span>
+            </div>
+          </div>
+        </div>
+        <div className="bg-surface-container-low p-space-sm rounded-lg flex flex-col gap-1 mt-2">
+          <div className="flex justify-between items-baseline">
+            <span className="font-label-sm text-label-sm text-outline">Accumulated:</span>
+            <span className={`font-numeric-lg text-numeric-lg font-bold ${color}`}>{formatCurrency(currentAmount)}</span>
+          </div>
+          <div className="flex justify-between items-baseline">
+            <span className="font-label-sm text-label-sm text-outline">Target Corpus:</span>
+            <span className="font-numeric-md text-numeric-md text-on-surface font-semibold">{formatCurrency(targetAmount)}</span>
+          </div>
+        </div>
+        <div className="flex flex-col gap-1 mt-2">
+          <div className="flex justify-between font-label-sm text-label-sm text-on-surface-variant">
+            <span>{monthsLeftStr}</span>
+            <span className="font-semibold text-primary-container">{goal.target_date ? String(goal.target_date).slice(0, 10) : 'No Target Date'}</span>
+          </div>
+          <div className="w-full h-2 bg-surface-container-high rounded-full overflow-hidden mt-1">
+            <div className={`${ringColor} h-full rounded-full`} style={{ width: `${Math.min(100, pct)}%` }}></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+})}
 </div>
 </div>
 {/*  Real-time Sparkline & Velocity Trend Analysis  */}

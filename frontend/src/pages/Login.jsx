@@ -32,7 +32,7 @@ export default function Login() {
 <div className="w-full bg-surface-container-lowest shadow-sm rounded-lg p-space-lg flex flex-col gap-space-lg">
 <div className="flex flex-col items-center text-center gap-space-sm">
 <div className="h-10 w-auto flex items-center justify-center mb-space-xs">
-<img alt="FinTrack Institutional Ledger System" className="h-9 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1V71bkGGxdL_flU3BZgt-LW8zse4BuUfTTPEEngie2aJ8UMcBgNLO8tu8sHp4V6hpAKlj9EfPmofLtD12I7WKK9gThiOS5YLyO8XCd9msAMU8grbS-U40eAW_WTSQ6uU4w55DwJ2qjtgh7OSVOsHK9WFnZ843wn0_350cuiguCrdXaqQ2e_EKBeQXgV9vPHMrHa3XQTQ_oUWb2uEI5CzR3Jt15C4-zbeQBgsQbscOAWJOzzpFE_tsm1mGXy"/>
+<img alt="FinTrack Institutional Ledger System" className="h-9 w-auto object-contain" src="/favicon.svg"/>
 </div>
 <div className="flex flex-col gap-space-xs">
 <div className="inline-flex items-center justify-center gap-1.5 self-center px-2 py-0.5 rounded-DEFAULT bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">

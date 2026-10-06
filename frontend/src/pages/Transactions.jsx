@@ -20,15 +20,48 @@ export default function Transactions() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [month, setMonth] = useState('');
+  const [category, setCategory] = useState('');
+  const [account, setAccount] = useState('');
+  const [engine, setEngine] = useState('');
+  const [amountRange, setAmountRange] = useState('');
+  const [categories, setCategories] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    apiClient.get('/categories').then(res => setCategories(res.data.categories || []));
+    apiClient.get('/accounts').then(res => setAccounts(res.data.accounts || []));
+  }, []);
 
   useEffect(() => {
     const handle = setTimeout(() => {
       setLoading(true);
       setError('');
-      apiClient
-        .get('/transactions', { params: { page, limit: LIMIT, search: search || undefined } })
+      let startDate, endDate, minAmount, maxAmount, needsReview;
+      if (month) {
+        startDate = month + '-01';
+        const [y, m] = month.split('-');
+        const lastDay = new Date(y, m, 0).getDate();
+        endDate = `${month}-${lastDay}`;
+      }
+      if (amountRange === '<1000') { maxAmount = 1000; }
+      else if (amountRange === '1000-10000') { minAmount = 1000; maxAmount = 10000; }
+      else if (amountRange === '>50000') { minAmount = 50000; }
+      
+      if (engine === 'needs_review') needsReview = true;
+
+      apiClient.get('/transactions', { 
+        params: { 
+          page, limit: LIMIT, search: search || undefined,
+          category_id: category || undefined,
+          account_id: account || undefined,
+          start_date: startDate, end_date: endDate,
+          min_amount: minAmount, max_amount: maxAmount,
+          needs_review: needsReview
+        } 
+      })
         .then((response) => {
           setTransactions(response.data.transactions);
           setTotal(response.data.total);
@@ -37,7 +70,7 @@ export default function Transactions() {
         .finally(() => setLoading(false));
     }, search ? 300 : 0);
     return () => clearTimeout(handle);
-  }, [page, search]);
+  }, [page, search, month, category, account, engine, amountRange]);
 
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
 
@@ -47,7 +80,7 @@ export default function Transactions() {
 - Font: newsreader
 - Mode: light
 - Roundness: rounded-sm
-" className="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1V71bkGGxdL_flU3BZgt-LW8zse4BuUfTTPEEngie2aJ8UMcBgNLO8tu8sHp4V6hpAKlj9EfPmofLtD12I7WKK9gThiOS5YLyO8XCd9msAMU8grbS-U40eAW_WTSQ6uU4w55DwJ2qjtgh7OSVOsHK9WFnZ843wn0_350cuiguCrdXaqQ2e_EKBeQXgV9vPHMrHa3XQTQ_oUWb2uEI5CzR3Jt15C4-zbeQBgsQbscOAWJOzzpFE_tsm1mGXy"/><div className="flex flex-col"><span className="font-headline-sm text-headline-sm font-semibold tracking-tight text-primary-container leading-none">FinTrack</span><span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mt-0.5">Personal Finance Analytics</span></div></div><div className="h-5 w-px bg-surface-variant hidden xl:block"></div><div className="hidden xl:flex items-center gap-space-xs px-space-sm py-0.5 rounded-lg bg-surface-container-low"><span className="material-symbols-outlined text-outline text-[16px]">lock</span><span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Audit Verified Ledger</span></div></div><div className="flex items-center gap-space-md"><div className="hidden sm:flex items-center gap-space-xs px-space-sm py-1 rounded-lg bg-surface-container-low text-on-surface"><span className="material-symbols-outlined text-outline text-[18px]">calendar_today</span><span className="font-label-md text-label-md font-semibold text-primary-container">Oct 2024</span><span className="w-1.5 h-1.5 rounded-full bg-secondary"></span></div><button onClick={() => alert("No new notifications")} aria-label="Budget Notifications" className="relative p-space-xs rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-on-surface" type="button"><span className="material-symbols-outlined text-[22px]">notifications</span><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface-container-lowest"></span></button><div className="h-6 w-px bg-surface-variant"></div><div className="flex items-center gap-space-sm pl-space-xs"><img alt="Profile" className="w-8 h-8 rounded-full object-cover ring-1 ring-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAiUVZ6t5iI-gkH3oQwhLRnaI-ZZcOKZbh6XJrMbATUZepl_j12Dd17Icr1532K6E0JB_qWjj4Yw5UTYx8iGFMZpaTEVHnZyPI2eIXhSTK1R3QzVrmV7ESqG_cSRyrfBuRG-OV5FkZvQOLAgjOgGcInARxYQqlp6n1PwQFRgzjNBeVMTLDAajEGiWQVNHpqq8mCfg51n-9i70ccueQ_fOO1lJAK8ooC8ioC2Z2RdjOyclKWhY3WtWkqHQ"/><div className="hidden md:flex flex-col text-left"><span className="font-label-md text-label-md font-semibold text-on-surface leading-tight">Arjun Patel</span><span className="font-label-sm text-label-sm text-secondary font-medium">Standard Tier</span></div></div></div></div></header><aside className="fixed left-0 top-16 bottom-0 w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex flex-col justify-between pt-space-md pb-space-lg"><div className="px-space-sm flex flex-col gap-space-sm"><div className="px-space-sm pb-space-xs"><span className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">Ledger Navigation</span></div><nav className="flex flex-col gap-1" data-active-classes="bg-primary-container text-on-primary font-semibold rounded-lg shadow-sm"><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="dashboard" href="/dashboard"><span className="material-symbols-outlined text-[20px]">dashboard</span><span className="font-body-md text-body-md">Dashboard</span></a><a aria-current="page" className="flex items-center gap-space-sm px-space-sm py-2 transition-colors bg-primary-container text-on-primary font-semibold rounded-lg shadow-sm" data-path="transactions" href="/transactions"><span className="material-symbols-outlined text-[20px]">receipt_long</span><span className="font-body-md text-body-md">Transactions</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="upload" href="/upload"><span className="material-symbols-outlined text-[20px]">upload_file</span><span className="font-body-md text-body-md">Upload</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="budgets-goals" href="/budgets"><span className="material-symbols-outlined text-[20px]">savings</span><span className="font-body-md text-body-md">Budgets &amp; Goals</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="ai-insights" href="/insights"><span className="material-symbols-outlined text-[20px]">psychology</span><span className="font-body-md text-body-md">AI Insights</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="monthly-report" href="/report"><span className="material-symbols-outlined text-[20px]">summarize</span><span className="font-body-md text-body-md">Monthly Report</span></a></nav></div><div className="px-space-sm flex flex-col gap-space-xs pt-space-md bg-surface-container-lowest"><div className="h-px w-full bg-surface-variant mb-space-xs"></div><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="account" href="/login"><span className="material-symbols-outlined text-[20px]">manage_accounts</span><span className="font-body-md text-body-md">Login / Account</span></a><div className="mt-space-xs p-space-sm rounded-lg bg-surface-container-low flex flex-col gap-1"><div className="flex items-center justify-between"><span className="font-label-sm text-label-sm font-semibold uppercase text-outline">Monthly Cap</span><span className="font-numeric-sm text-numeric-sm font-semibold text-secondary">68%</span></div><div className="w-full h-1.5 bg-surface-variant rounded-full overflow-hidden"><div className="h-full bg-secondary rounded-full" style={{ width: "68%" }}></div></div><span className="font-label-sm text-label-sm text-on-surface-variant">₹68,450 of ₹100,000</span></div></div></aside><div className="pl-64"><main className="w-full pt-16 min-h-screen px-margin-desktop py-space-lg bg-background"><div className="flex flex-col w-full">
+" className="h-8 w-auto object-contain" src="/favicon.svg"/><div className="flex flex-col"><span className="font-headline-sm text-headline-sm font-semibold tracking-tight text-primary-container leading-none">FinTrack</span><span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mt-0.5">Personal Finance Analytics</span></div></div><div className="h-5 w-px bg-surface-variant hidden xl:block"></div><div className="hidden xl:flex items-center gap-space-xs px-space-sm py-0.5 rounded-lg bg-surface-container-low"><span className="material-symbols-outlined text-outline text-[16px]">lock</span><span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Audit Verified Ledger</span></div></div><div className="flex items-center gap-space-md"><div className="hidden sm:flex items-center gap-space-xs px-space-sm py-1 rounded-lg bg-surface-container-low text-on-surface"><span className="material-symbols-outlined text-outline text-[18px]">calendar_today</span><span className="font-label-md text-label-md font-semibold text-primary-container">Oct 2024</span><span className="w-1.5 h-1.5 rounded-full bg-secondary"></span></div><button onClick={() => alert("No new notifications")} aria-label="Budget Notifications" className="relative p-space-xs rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-on-surface" type="button"><span className="material-symbols-outlined text-[22px]">notifications</span><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface-container-lowest"></span></button><div className="h-6 w-px bg-surface-variant"></div><div className="flex items-center gap-space-sm pl-space-xs"><img alt="Profile" className="w-8 h-8 rounded-full object-cover ring-1 ring-outline-variant" src="https://ui-avatars.com/api/?name=Arjun+Patel&background=0b1f3a&color=fff"/><div className="hidden md:flex flex-col text-left"><span className="font-label-md text-label-md font-semibold text-on-surface leading-tight">Arjun Patel</span><span className="font-label-sm text-label-sm text-secondary font-medium">Standard Tier</span></div></div></div></div></header><aside className="fixed left-0 top-16 bottom-0 w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex flex-col justify-between pt-space-md pb-space-lg"><div className="px-space-sm flex flex-col gap-space-sm"><div className="px-space-sm pb-space-xs"><span className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">Ledger Navigation</span></div><nav className="flex flex-col gap-1" data-active-classes="bg-primary-container text-on-primary font-semibold rounded-lg shadow-sm"><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="dashboard" href="/dashboard"><span className="material-symbols-outlined text-[20px]">dashboard</span><span className="font-body-md text-body-md">Dashboard</span></a><a aria-current="page" className="flex items-center gap-space-sm px-space-sm py-2 transition-colors bg-primary-container text-on-primary font-semibold rounded-lg shadow-sm" data-path="transactions" href="/transactions"><span className="material-symbols-outlined text-[20px]">receipt_long</span><span className="font-body-md text-body-md">Transactions</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="upload" href="/upload"><span className="material-symbols-outlined text-[20px]">upload_file</span><span className="font-body-md text-body-md">Upload</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="budgets-goals" href="/budgets"><span className="material-symbols-outlined text-[20px]">savings</span><span className="font-body-md text-body-md">Budgets &amp; Goals</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="ai-insights" href="/insights"><span className="material-symbols-outlined text-[20px]">psychology</span><span className="font-body-md text-body-md">AI Insights</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="monthly-report" href="/report"><span className="material-symbols-outlined text-[20px]">summarize</span><span className="font-body-md text-body-md">Monthly Report</span></a></nav></div><div className="px-space-sm flex flex-col gap-space-xs pt-space-md bg-surface-container-lowest"><div className="h-px w-full bg-surface-variant mb-space-xs"></div><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="account" href="/login"><span className="material-symbols-outlined text-[20px]">manage_accounts</span><span className="font-body-md text-body-md">Login / Account</span></a><div className="mt-space-xs p-space-sm rounded-lg bg-surface-container-low flex flex-col gap-1"><div className="flex items-center justify-between"><span className="font-label-sm text-label-sm font-semibold uppercase text-outline">Monthly Cap</span><span className="font-numeric-sm text-numeric-sm font-semibold text-secondary">68%</span></div><div className="w-full h-1.5 bg-surface-variant rounded-full overflow-hidden"><div className="h-full bg-secondary rounded-full" style={{ width: "68%" }}></div></div><span className="font-label-sm text-label-sm text-on-surface-variant">₹68,450 of ₹100,000</span></div></div></aside><div className="pl-64"><main className="w-full pt-16 min-h-screen px-margin-desktop py-space-lg bg-background"><div className="flex flex-col w-full">
 {/*  Ledger Operational Banner & Header Metrics  */}
 <div className="flex flex-col gap-space-md mb-space-lg">
 {/*  Top Editorial Header Bar  */}
@@ -65,7 +98,39 @@ export default function Transactions() {
 </div>
 {/*  Quick Action Utilities  */}
 <div className="flex items-center gap-space-sm self-start md:self-auto">
-<button className="flex items-center gap-space-xs px-3.5 py-1.5 rounded bg-surface-container-lowest text-on-surface shadow-sm hover:bg-surface-container-low transition-all" id="exportBtn" type="button">
+<button className="flex items-center gap-space-xs px-3.5 py-1.5 rounded bg-surface-container-lowest text-on-surface shadow-sm hover:bg-surface-container-low transition-all" id="exportBtn" type="button" onClick={() => {
+    let startDate, endDate, minAmount, maxAmount, needsReview;
+    if (month) {
+      startDate = month + "-01";
+      const [y, m] = month.split("-");
+      const lastDay = new Date(y, m, 0).getDate();
+      endDate = `${month}-${lastDay}`;
+    }
+    if (amountRange === "<1000") { maxAmount = 1000; }
+    else if (amountRange === "1000-10000") { minAmount = 1000; maxAmount = 10000; }
+    else if (amountRange === ">50000") { minAmount = 50000; }
+    if (engine === "needs_review") needsReview = true;
+    
+    const q = new URLSearchParams();
+    if (category) q.set("category_id", category);
+    if (account) q.set("account_id", account);
+    if (startDate) q.set("start_date", startDate);
+    if (endDate) q.set("end_date", endDate);
+    if (minAmount) q.set("min_amount", minAmount);
+    if (maxAmount) q.set("max_amount", maxAmount);
+    if (needsReview) q.set("needs_review", needsReview);
+    if (search) q.set("search", search);
+    
+    apiClient.get(`/transactions/export?${q.toString()}`).then(r => {
+      const url = window.URL.createObjectURL(new Blob([r.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "Transactions_Export.csv");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    });
+  }}>
 <span className="material-symbols-outlined text-[18px] text-primary-container">file_download</span>
 <span className="font-label-md text-label-md font-semibold text-primary-container">Export CSV</span>
 </button>
@@ -75,47 +140,8 @@ export default function Transactions() {
 </button>
 </div>
 </div>
-{/*  Micro Strip: Key Analytical Metrics & Daily Runway  */}
-<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter-desktop">
-<div className="p-space-sm rounded-lg bg-surface-container-lowest shadow-sm flex items-center justify-between">
-<div className="flex flex-col">
-<span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Period Inflow</span>
-<span className="font-numeric-lg text-numeric-lg text-secondary font-semibold tracking-tight">+₹1,25,000.00</span>
 </div>
-<div className="w-8 h-8 rounded bg-secondary-container text-on-secondary-container flex items-center justify-center">
-<span className="material-symbols-outlined text-[20px]">south_west</span>
-</div>
-</div>
-<div className="p-space-sm rounded-lg bg-surface-container-lowest shadow-sm flex items-center justify-between">
-<div className="flex flex-col">
-<span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Period Outflow</span>
-<span className="font-numeric-lg text-numeric-lg text-on-surface font-semibold tracking-tight">-₹54,280.50</span>
-</div>
-<div className="w-8 h-8 rounded bg-error-container text-on-error-container flex items-center justify-center">
-<span className="material-symbols-outlined text-[20px]">north_east</span>
-</div>
-</div>
-<div className="p-space-sm rounded-lg bg-surface-container-lowest shadow-sm flex items-center justify-between">
-<div className="flex flex-col">
-<span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Net Operating Surplus</span>
-<span className="font-numeric-lg text-numeric-lg text-primary-container font-semibold tracking-tight">+₹70,719.50</span>
-</div>
-<div className="w-8 h-8 rounded bg-surface-container text-on-primary-fixed-variant flex items-center justify-center">
-<span className="material-symbols-outlined text-[20px]">account_balance</span>
-</div>
-</div>
-<div className="p-space-sm rounded-lg bg-surface-container-lowest shadow-sm flex items-center justify-between">
-<div className="flex flex-col">
-<span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Automated Audit Confidence</span>
-<span className="font-numeric-lg text-numeric-lg text-on-surface font-semibold tracking-tight">98.4%</span>
-</div>
-<div className="w-8 h-8 rounded bg-surface-container-high text-secondary flex items-center justify-center">
-<span className="material-symbols-outlined text-[20px]">verified_user</span>
-</div>
-</div>
-</div>
-</div>
-{/*  Filter Toolbar (Data Precision Surface)  */}
+{/* Filter Toolbar (Data Precision Surface)  */}
 <div className="p-space-md rounded-lg bg-surface-container-lowest shadow-sm mb-space-md">
 <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-space-sm">
 {/*  Search Input  */}
@@ -127,79 +153,53 @@ export default function Transactions() {
 <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-space-xs">
 {/*  Date Range  */}
 <div className="relative">
-<select className="w-full appearance-none pl-3 pr-7 py-2 bg-surface-container-low text-on-surface font-label-md text-label-md rounded focus:outline-none cursor-pointer">
-<option>Oct 1 - Oct 31, 2024</option>
-<option>Previous Month (Sep 2024)</option>
-<option>Q3 2024 (Jul - Sep)</option>
-<option>Fiscal Year 2024-25</option>
+<select value={month} onChange={e => {setPage(1); setMonth(e.target.value);}} className="w-full appearance-none pl-3 pr-7 py-2 bg-surface-container-low text-on-surface font-label-md text-label-md rounded focus:outline-none cursor-pointer">
+<option value="">All Time</option>
+<option value="2026-10">October 2026</option>
+<option value="2026-09">September 2026</option>
+<option value="2026-08">August 2026</option>
+<option value="2026-07">July 2026</option>
 </select>
 <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-outline text-[16px] pointer-events-none">expand_more</span>
 </div>
 {/*  Category  */}
 <div className="relative">
-<select className="w-full appearance-none pl-3 pr-7 py-2 bg-surface-container-low text-on-surface font-label-md text-label-md rounded focus:outline-none cursor-pointer">
-<option>All Categories</option>
-<option>Dining &amp; Food</option>
-<option>Groceries</option>
-<option>Income / Salary</option>
-<option>Transportation</option>
-<option>Subscriptions</option>
-<option>Fitness &amp; Health</option>
-<option>Utilities</option>
+<select value={category} onChange={e => {setPage(1); setCategory(e.target.value);}} className="w-full appearance-none pl-3 pr-7 py-2 bg-surface-container-low text-on-surface font-label-md text-label-md rounded focus:outline-none cursor-pointer">
+<option value="">All Categories</option>
+{categories.map(c => <option key={c.category_id} value={c.category_id}>{c.name}</option>)}
 </select>
 <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-outline text-[16px] pointer-events-none">filter_list</span>
 </div>
 {/*  Account  */}
 <div className="relative">
-<select className="w-full appearance-none pl-3 pr-7 py-2 bg-surface-container-low text-on-surface font-label-md text-label-md rounded focus:outline-none cursor-pointer">
-<option>All Accounts</option>
-<option>HDFC Bank ••4091</option>
-<option>ICICI Bank ••1822</option>
-<option>SBI Savings ••9904</option>
+<select value={account} onChange={e => {setPage(1); setAccount(e.target.value);}} className="w-full appearance-none pl-3 pr-7 py-2 bg-surface-container-low text-on-surface font-label-md text-label-md rounded focus:outline-none cursor-pointer">
+<option value="">All Accounts</option>
+{accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.account_name}</option>)}
 </select>
 <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-outline text-[16px] pointer-events-none">account_balance_wallet</span>
 </div>
 {/*  Engine / Categorization Source  */}
 <div className="relative">
-<select className="w-full appearance-none pl-3 pr-7 py-2 bg-surface-container-low text-on-surface font-label-md text-label-md rounded focus:outline-none cursor-pointer">
-<option>All Match Methods</option>
-<option>Rule-matched (Deterministic)</option>
-<option>AI-assisted (Heuristic / ML)</option>
-<option>Manual User Categorized</option>
-<option>Requires Review</option>
+<select value={engine} onChange={e => {setPage(1); setEngine(e.target.value);}} className="w-full appearance-none pl-3 pr-7 py-2 bg-surface-container-low text-on-surface font-label-md text-label-md rounded focus:outline-none cursor-pointer">
+<option value="">All Match Methods</option>
+<option value="needs_review">Requires Review</option>
 </select>
 <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-outline text-[16px] pointer-events-none">neurology</span>
 </div>
 {/*  Amount Range Quick Pill  */}
 <div className="relative col-span-2 sm:col-span-1">
-<select className="w-full appearance-none pl-3 pr-7 py-2 bg-surface-container-low text-on-surface font-label-md text-label-md rounded focus:outline-none cursor-pointer">
-<option>₹0 - ₹1,00,000+</option>
-<option>&lt; ₹1,000</option>
-<option>₹1,000 - ₹10,000</option>
-<option>&gt; ₹50,000</option>
+<select value={amountRange} onChange={e => {setPage(1); setAmountRange(e.target.value);}} className="w-full appearance-none pl-3 pr-7 py-2 bg-surface-container-low text-on-surface font-label-md text-label-md rounded focus:outline-none cursor-pointer">
+<option value="">Any Amount</option>
+<option value="<1000">&lt; ₹1,000</option>
+<option value="1000-10000">₹1,000 - ₹10,000</option>
+<option value=">50000">&gt; ₹50,000</option>
 </select>
 <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-outline text-[16px] pointer-events-none">payments</span>
 </div>
 </div>
 </div>
-{/*  Active Filter Chips strip  */}
-<div className="flex items-center gap-space-xs mt-space-sm pt-space-xs text-on-surface-variant flex-wrap">
-<span className="font-label-sm text-label-sm uppercase tracking-wider text-outline">Active Constraints:</span>
-<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container-high text-on-surface font-label-sm text-label-sm">
-        Date: Oct 2024
-        <button className="hover:text-error ml-0.5"><span className="material-symbols-outlined text-[14px]">close</span></button>
-</span>
-<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container-high text-on-surface font-label-sm text-label-sm">
-        Method: Deterministic + AI
-        <button className="hover:text-error ml-0.5"><span className="material-symbols-outlined text-[14px]">close</span></button>
-</span>
-<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container-high text-on-surface font-label-sm text-label-sm">
-        Currencies: INR (₹)
-      </span>
-<button className="font-label-sm text-label-sm text-secondary hover:underline ml-auto font-medium">Reset All Filters</button>
 </div>
-</div>
-{/*  Ledger Table Canvas Container  */}
+{/* Ledger Table Canvas Container */}
 <div className="bg-surface-container-lowest rounded-lg shadow-sm overflow-hidden flex flex-col">
 {/*  Tabular Scroller  */}
 <div className="overflow-x-auto w-full">
@@ -304,101 +304,7 @@ export default function Transactions() {
 </div>
 </div>
 </div>
-{/*  Detailed Ledger Breakdown Cards (Asymmetric Bottom Summary)  */}
-<div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter-desktop mt-space-lg">
-{/*  Visual Spending Flow Preview  */}
-<div className="lg:col-span-8 p-space-md rounded-lg bg-surface-container-lowest shadow-sm flex flex-col justify-between">
-<div className="flex items-center justify-between mb-space-sm">
-<div>
-<h3 className="font-headline-sm text-headline-sm text-primary font-semibold">Monthly Outflow Cadence</h3>
-<span className="font-body-sm text-body-sm text-on-surface-variant">Daily transaction velocity across selected October window</span>
-</div>
-<div className="flex items-center gap-space-xs font-label-sm text-label-sm text-outline">
-<span className="w-2.5 h-2.5 rounded-sm bg-primary-container"></span> Regular Expense
-          <span className="w-2.5 h-2.5 rounded-sm bg-secondary ml-2"></span> High Variance
-        </div>
-</div>
-{/*  Inline SVG Spark-Line Bar Spectrum (under 2KB)  */}
-<div className="w-full h-32 pt-2">
-<svg className="w-full h-full text-primary-container" fill="none" preserveaspectratio="none" viewBox="0 0 700 90">
-{/*  Baseline  */}
-<line stroke="currentColor" stroke-opacity="0.1" strokeWidth="1" x1="0" x2="700" y1="85" y2="85"></line>
-{/*  Bar Groups representing daily spend in Oct  */}
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="30" rx="2" width="14" x="20" y="55"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="23" rx="2" width="14" x="44" y="62"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="37" rx="2" width="14" x="68" y="48"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="15" rx="2" width="14" x="92" y="70"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="45" rx="2" width="14" x="116" y="40"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="27" rx="2" width="14" x="140" y="58"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="53" rx="2" width="14" x="164" y="32"></rect>
-{/*  Oct 15 Spike: Blue Tokai + Supplies  */}
-<rect className="fill-primary-container" height="61" rx="2" width="14" x="188" y="24"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="20" rx="2" width="14" x="212" y="65"></rect>
-{/*  Oct 17 Utility Bill Spike  */}
-<rect className="fill-secondary" height="67" rx="2" width="14" x="236" y="18"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="41" rx="2" width="14" x="260" y="44"></rect>
-{/*  Oct 19 AWS Subscription Spike  */}
-<rect className="fill-secondary" height="73" rx="2" width="14" x="284" y="12"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="35" rx="2" width="14" x="308" y="50"></rect>
-{/*  Oct 22 Salary Day indicator (surplus marked)  */}
-<rect className="fill-secondary" height="80" rx="2" width="14" x="332" y="5"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="33" rx="2" width="14" x="356" y="52"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="47" rx="2" width="14" x="380" y="38"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="25" rx="2" width="14" x="404" y="60"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="40" rx="2" width="14" x="428" y="45"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="15" rx="2" width="14" x="452" y="70"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="55" rx="2" width="14" x="476" y="30"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="30" rx="2" width="14" x="500" y="55"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="23" rx="2" width="14" x="524" y="62"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="45" rx="2" width="14" x="548" y="40"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="10" rx="2" width="14" x="572" y="75"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="50" rx="2" width="14" x="596" y="35"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="37" rx="2" width="14" x="620" y="48"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="19" rx="2" width="14" x="644" y="66"></rect>
-<rect className="fill-surface-variant hover:fill-primary-container transition-colors" height="31" rx="2" width="14" x="668" y="54"></rect>
-</svg>
-</div>
-<div className="flex justify-between items-center text-outline font-label-sm text-label-sm pt-2 border-none">
-<span>Oct 01</span>
-<span>Oct 08</span>
-<span>Oct 15 (Blue Tokai)</span>
-<span>Oct 22 (Salary Credit)</span>
-<span>Oct 31</span>
-</div>
-</div>
-{/*  Ledger Reconciliation & Audit State Card  */}
-<div className="lg:col-span-4 p-space-md rounded-lg bg-surface-container-lowest shadow-sm flex flex-col justify-between">
-<div>
-<div className="flex items-center justify-between mb-2">
-<span className="font-label-sm text-label-sm uppercase tracking-wider text-outline">Audit Reconciliation</span>
-<span className="inline-flex items-center gap-1 text-secondary font-label-sm text-label-sm font-semibold">
-<span className="w-1.5 h-1.5 rounded-full bg-secondary"></span> 100% Balanced
-          </span>
-</div>
-<h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold mb-space-xs">Double-Entry Ledger Integrity</h3>
-<p className="font-body-sm text-body-sm text-on-surface-variant leading-relaxed mb-space-md">
-          Every counterparty posting matches reported core banking statements from HDFC &amp; ICICI servers. No pending suspense balances detected.
-        </p>
-<div className="space-y-space-xs">
-<div className="p-space-xs rounded bg-surface-container-low flex items-center justify-between">
-<span className="font-label-sm text-label-sm text-on-surface-variant">Cleared Debits (Oct)</span>
-<span className="font-numeric-sm text-numeric-sm font-semibold text-on-surface">₹54,280.50</span>
-</div>
-<div className="p-space-xs rounded bg-surface-container-low flex items-center justify-between">
-<span className="font-label-sm text-label-sm text-on-surface-variant">Verified Credits (Oct)</span>
-<span className="font-numeric-sm text-numeric-sm font-semibold text-secondary">₹1,25,000.00</span>
-</div>
-</div>
-</div>
-<div className="pt-space-md">
-<button className="w-full py-2 px-3 rounded bg-surface-container text-on-primary-fixed-variant hover:bg-surface-container-high transition-colors font-label-md text-label-md font-semibold flex items-center justify-center gap-space-xs">
-<span className="material-symbols-outlined text-[18px]">verified</span>
-          Generate Monthly Audit Certificate
-        </button>
-</div>
-</div>
-</div>
-{/*  Manual Entry Modal Drawer (Hidden by default, interactive script toggles)  */}
+{/* Manual Entry Modal Drawer (Hidden by default, interactive script toggles)  */}
 <div className="fixed inset-0 z-50 bg-inverse-surface/40 backdrop-blur-sm hidden flex items-center justify-center p-4" id="manualModal">
 <div className="bg-surface-container-lowest rounded-lg shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
 {/*  Modal Header  */}

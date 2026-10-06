@@ -17,6 +17,10 @@ app.use('/api/accounts', require('./routes/accounts.routes'));
 app.use('/api/categories', require('./routes/categories.routes'));
 app.use('/api/budgets', require('./routes/budgets.routes'));
 app.use('/api/transactions', require('./routes/transactions.routes'));
+app.use('/api/insights', require('./routes/insights.routes'));
+app.use('/api/analytics', require('./routes/analytics.routes'));
+app.use('/api/reports', require('./routes/reports.routes'));
+app.use('/api/goals', require('./routes/goals.routes'));
 
 // Remaining feature routes are mounted here as each one is implemented.
 // See IMPLEMENTATION_PLAN.md section 6 for the full task list.

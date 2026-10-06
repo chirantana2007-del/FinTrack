@@ -1,13 +1,60 @@
 import React from 'react';
+import apiClient from '../api/client';
 
 export default function Report() {
+  const [month, setMonth] = React.useState('');
+  const [data, setData] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    setLoading(true);
+    apiClient.get('/reports/summary', { params: { month: month || undefined } })
+      .then(res => setData(res.data.data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [month]);
+
+  const handleDownloadCSV = async () => {
+    try {
+        const response = await apiClient.get('/reports/export-csv', { params: { month: month || undefined }, responseType: 'blob' });
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `FinTrack_Report_${data.period.month.slice(0, 7)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+    } catch (err) {
+        console.error(err);
+        alert('Failed to download CSV');
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    try {
+        const response = await apiClient.get('/reports/export', { params: { month: month || undefined }, responseType: 'blob' });
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'FinTrack_Report.pdf');
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+    } catch (err) {
+        console.error(err);
+        alert('Failed to download PDF');
+    }
+  };
+
+  if (loading || !data) return <div className="p-10 text-center mt-20 font-headline-md">Loading Report...</div>;
+
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="w-full h-full px-margin-desktop flex items-center justify-between"><div className="flex items-center gap-space-lg"><div className="flex items-center gap-space-sm"><img alt="Brand logo. - Primary color: #0b1f3a
 - Font: newsreader
 - Mode: light
 - Roundness: rounded-sm
-" className="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1V71bkGGxdL_flU3BZgt-LW8zse4BuUfTTPEEngie2aJ8UMcBgNLO8tu8sHp4V6hpAKlj9EfPmofLtD12I7WKK9gThiOS5YLyO8XCd9msAMU8grbS-U40eAW_WTSQ6uU4w55DwJ2qjtgh7OSVOsHK9WFnZ843wn0_350cuiguCrdXaqQ2e_EKBeQXgV9vPHMrHa3XQTQ_oUWb2uEI5CzR3Jt15C4-zbeQBgsQbscOAWJOzzpFE_tsm1mGXy"/><div className="flex flex-col"><span className="font-headline-sm text-headline-sm font-semibold tracking-tight text-primary-container leading-none">FinTrack</span><span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mt-0.5">Personal Finance Analytics</span></div></div><div className="h-5 w-px bg-surface-variant hidden xl:block"></div><div className="hidden xl:flex items-center gap-space-xs px-space-sm py-0.5 rounded-lg bg-surface-container-low"><span className="material-symbols-outlined text-outline text-[16px]">lock</span><span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Audit Verified Ledger</span></div></div><div className="flex items-center gap-space-md"><div className="hidden sm:flex items-center gap-space-xs px-space-sm py-1 rounded-lg bg-surface-container-low text-on-surface"><span className="material-symbols-outlined text-outline text-[18px]">calendar_today</span><span className="font-label-md text-label-md font-semibold text-primary-container">Oct 2024</span><span className="w-1.5 h-1.5 rounded-full bg-secondary"></span></div><button onClick={() => alert("No new notifications")} aria-label="Budget Notifications" className="relative p-space-xs rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-on-surface" type="button"><span className="material-symbols-outlined text-[22px]">notifications</span><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface-container-lowest"></span></button><div className="h-6 w-px bg-surface-variant"></div><div className="flex items-center gap-space-sm pl-space-xs"><img alt="Profile" className="w-8 h-8 rounded-full object-cover ring-1 ring-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAiUVZ6t5iI-gkH3oQwhLRnaI-ZZcOKZbh6XJrMbATUZepl_j12Dd17Icr1532K6E0JB_qWjj4Yw5UTYx8iGFMZpaTEVHnZyPI2eIXhSTK1R3QzVrmV7ESqG_cSRyrfBuRG-OV5FkZvQOLAgjOgGcInARxYQqlp6n1PwQFRgzjNBeVMTLDAajEGiWQVNHpqq8mCfg51n-9i70ccueQ_fOO1lJAK8ooC8ioC2Z2RdjOyclKWhY3WtWkqHQ"/><div className="hidden md:flex flex-col text-left"><span className="font-label-md text-label-md font-semibold text-on-surface leading-tight">Arjun Patel</span><span className="font-label-sm text-label-sm text-secondary font-medium">Standard Tier</span></div></div></div></div></header><aside className="fixed left-0 top-16 bottom-0 w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex flex-col justify-between pt-space-md pb-space-lg"><div className="px-space-sm flex flex-col gap-space-sm"><div className="px-space-sm pb-space-xs"><span className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">Ledger Navigation</span></div><nav className="flex flex-col gap-1" data-active-classes="bg-primary-container text-on-primary font-semibold rounded-lg shadow-sm"><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="dashboard" href="/dashboard"><span className="material-symbols-outlined text-[20px]">dashboard</span><span className="font-body-md text-body-md">Dashboard</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="transactions" href="/transactions"><span className="material-symbols-outlined text-[20px]">receipt_long</span><span className="font-body-md text-body-md">Transactions</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="upload" href="/upload"><span className="material-symbols-outlined text-[20px]">upload_file</span><span className="font-body-md text-body-md">Upload</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="budgets-goals" href="/budgets"><span className="material-symbols-outlined text-[20px]">savings</span><span className="font-body-md text-body-md">Budgets &amp; Goals</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="ai-insights" href="/insights"><span className="material-symbols-outlined text-[20px]">psychology</span><span className="font-body-md text-body-md">AI Insights</span></a><a aria-current="page" className="flex items-center gap-space-sm px-space-sm py-2 transition-colors bg-primary-container text-on-primary font-semibold rounded-lg shadow-sm" data-path="monthly-report" href="/report"><span className="material-symbols-outlined text-[20px]">summarize</span><span className="font-body-md text-body-md">Monthly Report</span></a></nav></div><div className="px-space-sm flex flex-col gap-space-xs pt-space-md bg-surface-container-lowest"><div className="h-px w-full bg-surface-variant mb-space-xs"></div><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="account" href="/login"><span className="material-symbols-outlined text-[20px]">manage_accounts</span><span className="font-body-md text-body-md">Login / Account</span></a><div className="mt-space-xs p-space-sm rounded-lg bg-surface-container-low flex flex-col gap-1"><div className="flex items-center justify-between"><span className="font-label-sm text-label-sm font-semibold uppercase text-outline">Monthly Cap</span><span className="font-numeric-sm text-numeric-sm font-semibold text-secondary">68%</span></div><div className="w-full h-1.5 bg-surface-variant rounded-full overflow-hidden"><div className="h-full bg-secondary rounded-full" style={{ width: "68%" }}></div></div><span className="font-label-sm text-label-sm text-on-surface-variant">₹68,450 of ₹100,000</span></div></div></aside><div className="pl-64"><main className="w-full pt-16 min-h-screen px-margin-desktop py-space-lg bg-background"><div className="flex flex-col w-full max-w-[1440px] mx-auto gap-space-lg">
+" className="h-8 w-auto object-contain" src="/favicon.svg"/><div className="flex flex-col"><span className="font-headline-sm text-headline-sm font-semibold tracking-tight text-primary-container leading-none">FinTrack</span><span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mt-0.5">Personal Finance Analytics</span></div></div><div className="h-5 w-px bg-surface-variant hidden xl:block"></div><div className="hidden xl:flex items-center gap-space-xs px-space-sm py-0.5 rounded-lg bg-surface-container-low"><span className="material-symbols-outlined text-outline text-[16px]">lock</span><span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Audit Verified Ledger</span></div></div><div className="flex items-center gap-space-md"><div className="hidden sm:flex items-center gap-space-xs px-space-sm py-1 rounded-lg bg-surface-container-low text-on-surface"><span className="material-symbols-outlined text-outline text-[18px]">calendar_today</span><span className="font-label-md text-label-md font-semibold text-primary-container">{data.period.label}</span><span className="w-1.5 h-1.5 rounded-full bg-secondary"></span></div><button onClick={() => alert("No new notifications")} aria-label="Budget Notifications" className="relative p-space-xs rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-on-surface" type="button"><span className="material-symbols-outlined text-[22px]">notifications</span><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface-container-lowest"></span></button><div className="h-6 w-px bg-surface-variant"></div><div className="flex items-center gap-space-sm pl-space-xs"><img alt="Profile" className="w-8 h-8 rounded-full object-cover ring-1 ring-outline-variant" src="https://ui-avatars.com/api/?name=Arjun+Patel&background=0b1f3a&color=fff"/><div className="hidden md:flex flex-col text-left"><span className="font-label-md text-label-md font-semibold text-on-surface leading-tight">{data.user ? data.user.name : "Demo User"}</span><span className="font-label-sm text-label-sm text-secondary font-medium">Standard Tier</span></div></div></div></div></header><aside className="fixed left-0 top-16 bottom-0 w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex flex-col justify-between pt-space-md pb-space-lg"><div className="px-space-sm flex flex-col gap-space-sm"><div className="px-space-sm pb-space-xs"><span className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">Ledger Navigation</span></div><nav className="flex flex-col gap-1" data-active-classes="bg-primary-container text-on-primary font-semibold rounded-lg shadow-sm"><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="dashboard" href="/dashboard"><span className="material-symbols-outlined text-[20px]">dashboard</span><span className="font-body-md text-body-md">Dashboard</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="transactions" href="/transactions"><span className="material-symbols-outlined text-[20px]">receipt_long</span><span className="font-body-md text-body-md">Transactions</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="upload" href="/upload"><span className="material-symbols-outlined text-[20px]">upload_file</span><span className="font-body-md text-body-md">Upload</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="budgets-goals" href="/budgets"><span className="material-symbols-outlined text-[20px]">savings</span><span className="font-body-md text-body-md">Budgets &amp; Goals</span></a><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="ai-insights" href="/insights"><span className="material-symbols-outlined text-[20px]">psychology</span><span className="font-body-md text-body-md">AI Insights</span></a><a aria-current="page" className="flex items-center gap-space-sm px-space-sm py-2 transition-colors bg-primary-container text-on-primary font-semibold rounded-lg shadow-sm" data-path="monthly-report" href="/report"><span className="material-symbols-outlined text-[20px]">summarize</span><span className="font-body-md text-body-md">Monthly Report</span></a></nav></div><div className="px-space-sm flex flex-col gap-space-xs pt-space-md bg-surface-container-lowest"><div className="h-px w-full bg-surface-variant mb-space-xs"></div><a className="flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="account" href="/login"><span className="material-symbols-outlined text-[20px]">manage_accounts</span><span className="font-body-md text-body-md">Login / Account</span></a><div className="mt-space-xs p-space-sm rounded-lg bg-surface-container-low flex flex-col gap-1"><div className="flex items-center justify-between"><span className="font-label-sm text-label-sm font-semibold uppercase text-outline">Monthly Cap</span><span className="font-numeric-sm text-numeric-sm font-semibold text-secondary">68%</span></div><div className="w-full h-1.5 bg-surface-variant rounded-full overflow-hidden"><div className="h-full bg-secondary rounded-full" style={{ width: "68%" }}></div></div><span className="font-label-sm text-label-sm text-on-surface-variant">₹68,450 of ₹100,000</span></div></div></aside><div className="pl-64"><main className="w-full pt-16 min-h-screen px-margin-desktop py-space-lg bg-background"><div className="flex flex-col w-full max-w-[1440px] mx-auto gap-space-lg">
 {/*  Interactive Export & Utility Header Toolbar  */}
 <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-space-md p-space-md rounded-xl bg-surface-container-lowest shadow-sm">
 <div className="flex items-center gap-space-md min-w-0">
@@ -24,24 +71,24 @@ export default function Report() {
 </div>
 {/*  Month Selector Engine  */}
 <div className="flex items-center justify-between sm:justify-center gap-space-xs bg-surface-container-low p-1 rounded-xl">
-<button aria-label="Previous Month" className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors flex items-center" id="prevMonthBtn" type="button">
+<button aria-label="Previous Month" className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors flex items-center" id="prevMonthBtn" type="button" onClick={() => setMonth(data.period.previousMonth)}>
 <span className="material-symbols-outlined text-[20px]">chevron_left</span>
 </button>
 <div className="flex items-center gap-space-xs px-3 py-1 bg-surface-container-lowest rounded-lg shadow-sm">
 <span className="material-symbols-outlined text-secondary text-[16px]">calendar_month</span>
-<span className="font-label-md text-label-md font-semibold text-primary-container" id="selectedMonthDisplay">October 2024</span>
+<span className="font-label-md text-label-md font-semibold text-primary-container" id="selectedMonthDisplay">{data.period.label}</span>
 </div>
-<button aria-label="Next Month" className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors flex items-center" id="nextMonthBtn" type="button">
+<button aria-label="Next Month" className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors flex items-center" id="nextMonthBtn" type="button" onClick={() => setMonth(data.availableMonths[data.availableMonths.indexOf(data.period.month) - 1] || data.period.month)} disabled={!data.availableMonths[data.availableMonths.indexOf(data.period.month) - 1]}>
 <span className="material-symbols-outlined text-[20px]">chevron_right</span>
 </button>
 </div>
 {/*  Export Action Triggers  */}
 <div className="flex items-center gap-space-sm flex-wrap sm:flex-nowrap">
-<button className="flex-1 sm:flex-initial flex items-center justify-center gap-space-xs px-space-md py-2 rounded-lg bg-surface-container-high hover:bg-surface-variant text-on-surface font-label-md text-label-md font-semibold transition-colors" id="csvExportBtn" type="button">
+<button className="flex-1 sm:flex-initial flex items-center justify-center gap-space-xs px-space-md py-2 rounded-lg bg-surface-container-high hover:bg-surface-variant text-on-surface font-label-md text-label-md font-semibold transition-colors" id="csvExportBtn" type="button" onClick={handleDownloadCSV}>
 <span className="material-symbols-outlined text-[18px]">table_view</span>
 <span>Export Raw CSV</span>
 </button>
-<button className="flex-1 sm:flex-initial flex items-center justify-center gap-space-xs px-space-md py-2 rounded-lg bg-primary-container text-on-primary hover:bg-primary font-label-md text-label-md font-semibold shadow-sm transition-all" id="pdfExportBtn" type="button">
+<button onClick={handleDownloadPDF} className="flex-1 sm:flex-initial flex items-center justify-center gap-space-xs px-space-md py-2 rounded-lg bg-primary-container text-on-primary hover:bg-primary font-label-md text-label-md font-semibold shadow-sm transition-all" id="pdfExportBtn" type="button">
 <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
 <span>Export as PDF (Executive Report)</span>
 </button>
@@ -61,7 +108,7 @@ export default function Report() {
 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-space-md pb-space-lg bg-surface-container-lowest">
 <div className="flex flex-col gap-space-xs">
 <div className="flex items-center gap-space-sm">
-<img alt="FinTrack Logo" className="h-9 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1V71bkGGxdL_flU3BZgt-LW8zse4BuUfTTPEEngie2aJ8UMcBgNLO8tu8sHp4V6hpAKlj9EfPmofLtD12I7WKK9gThiOS5YLyO8XCd9msAMU8grbS-U40eAW_WTSQ6uU4w55DwJ2qjtgh7OSVOsHK9WFnZ843wn0_350cuiguCrdXaqQ2e_EKBeQXgV9vPHMrHa3XQTQ_oUWb2uEI5CzR3Jt15C4-zbeQBgsQbscOAWJOzzpFE_tsm1mGXy"/>
+<img alt="FinTrack Logo" className="h-9 w-auto object-contain" src="/favicon.svg"/>
 <div className="h-6 w-1 bg-secondary rounded-full"></div>
 <span className="font-headline-md text-headline-md font-bold tracking-tight text-primary-container uppercase">Executive Statement</span>
 </div>
@@ -71,17 +118,17 @@ export default function Report() {
 <div className="w-full md:w-auto grid grid-cols-2 sm:grid-cols-4 gap-space-sm p-space-md rounded-xl bg-surface-container-low">
 <div className="flex flex-col">
 <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Account Holder</span>
-<span className="font-label-md text-label-md font-semibold text-on-surface">Arjun Patel</span>
-<span className="font-numeric-sm text-numeric-sm text-on-surface-variant">ID: #IND-9024</span>
+<span className="font-label-md text-label-md font-semibold text-on-surface">{data.user ? data.user.name : "Demo User"}</span>
+<span className="font-numeric-sm text-numeric-sm text-on-surface-variant">ID: #{data.user ? data.user.id : "0000"}</span>
 </div>
 <div className="flex flex-col">
 <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Statement Period</span>
-<span className="font-label-md text-label-md font-semibold text-on-surface">01 Oct – 31 Oct 2024</span>
-<span className="font-numeric-sm text-numeric-sm text-on-surface-variant">31 Days • Complete</span>
+<span className="font-label-md text-label-md font-semibold text-on-surface">01 Oct – 31 {data.period.label}</span>
+<span className="font-numeric-sm text-numeric-sm text-on-surface-variant">{data.period.daysInMonth} Days • {data.period.isCurrent ? "In Progress" : "Complete"}</span>
 </div>
 <div className="flex flex-col">
 <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Generated At</span>
-<span className="font-label-md text-label-md font-semibold text-on-surface">24 Oct 2024, 18:00</span>
+<span className="font-label-md text-label-md font-semibold text-on-surface">24 {data.period.label}, 18:00</span>
 <span className="font-numeric-sm text-numeric-sm text-on-surface-variant">Standard IST (+05:30)</span>
 </div>
 <div className="flex flex-col">
@@ -100,10 +147,10 @@ export default function Report() {
 <div className="lg:col-span-8 p-space-lg rounded-xl bg-surface-container-low flex flex-col justify-between gap-space-md relative overflow-hidden">
 <div className="flex items-center justify-between">
 <div className="flex flex-col">
-<span className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">Net Cash Flow Trajectory • Oct 2024</span>
-<span className="font-headline-sm text-headline-sm font-semibold text-primary-container">Surplus Capital Allocation: ₹70,719.50</span>
+<span className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">Net Cash Flow Trajectory • {data.period.label}</span>
+<span className="font-headline-sm text-headline-sm font-semibold text-primary-container">Surplus Capital Allocation: ₹{data.totals.net.toLocaleString()}</span>
 </div>
-<span className="px-space-sm py-1 rounded-full bg-secondary text-on-secondary font-label-sm text-label-sm font-semibold tracking-wide uppercase">56.5% Savings Ratio</span>
+<span className="px-space-sm py-1 rounded-full bg-secondary text-on-secondary font-label-sm text-label-sm font-semibold tracking-wide uppercase">{data.totals.savingsRate ?? 0}% Savings Ratio</span>
 </div>
 {/*  Inline SVG Trend Chart (30-day cumulative net position)  */}
 <div className="w-full h-36 flex items-end">
@@ -170,7 +217,7 @@ export default function Report() {
 <span className="material-symbols-outlined text-secondary text-[20px]">arrow_downward</span>
 </div>
 <div className="mt-space-sm flex flex-col">
-<span className="font-display-lg text-display-lg font-bold text-primary-container leading-tight">₹1,25,000<span className="text-headline-sm font-normal text-on-surface-variant">.00</span></span>
+<span className="font-display-lg text-display-lg font-bold text-primary-container leading-tight">{`₹${data.totals.income.toLocaleString()}`}</span>
 <span className="font-body-sm text-body-sm text-secondary font-medium mt-1 flex items-center gap-1">
 <span className="material-symbols-outlined text-[14px]">check_circle</span> 100% Verified Salary Deposit
             </span>
@@ -183,7 +230,7 @@ export default function Report() {
 <span className="material-symbols-outlined text-outline text-[20px]">arrow_upward</span>
 </div>
 <div className="mt-space-sm flex flex-col">
-<span className="font-display-lg text-display-lg font-bold text-on-surface leading-tight">₹54,280<span className="text-headline-sm font-normal text-on-surface-variant">.50</span></span>
+<span className="font-display-lg text-display-lg font-bold text-on-surface leading-tight">{`₹${data.totals.expense.toLocaleString()}`}</span>
 <span className="font-body-sm text-body-sm text-secondary font-medium mt-1 flex items-center gap-1">
 <span className="material-symbols-outlined text-[14px]">trending_down</span> -₹6,819.50 vs Prev Month
             </span>
@@ -196,10 +243,10 @@ export default function Report() {
 <span className="material-symbols-outlined text-secondary text-[20px]">account_balance_wallet</span>
 </div>
 <div className="mt-space-sm flex flex-col">
-<span className="font-display-lg text-display-lg font-bold text-secondary leading-tight">₹70,719<span className="text-headline-sm font-normal text-on-surface-variant">.50</span></span>
+<span className="font-display-lg text-display-lg font-bold text-secondary leading-tight">{`₹${data.totals.net.toLocaleString()}`}</span>
 <div className="flex items-center justify-between mt-1">
 <span className="font-body-sm text-body-sm text-on-surface-variant font-medium">Effective Savings Rate:</span>
-<span className="font-numeric-sm text-numeric-sm font-bold text-secondary">56.5%</span>
+<span className="font-numeric-sm text-numeric-sm font-bold text-secondary">{data.totals.savingsRate ?? 0}%</span>
 </div>
 </div>
 </div>
@@ -237,130 +284,35 @@ export default function Report() {
 <tr className="bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
 <th className="py-3 px-4 font-semibold" scope="col">Ledger Category</th>
 <th className="py-3 px-4 text-right font-semibold" scope="col">September 2024</th>
-<th className="py-3 px-4 text-right font-semibold" scope="col">October 2024</th>
+<th className="py-3 px-4 text-right font-semibold" scope="col">{data.period.label}</th>
 <th className="py-3 px-4 text-right font-semibold" scope="col">Variance (₹)</th>
 <th className="py-3 px-4 text-right font-semibold" scope="col">% Variance</th>
 <th className="py-3 px-4 text-center font-semibold" scope="col">Status / Tag</th>
 </tr>
 </thead>
 <tbody className="divide-y divide-surface-container font-body-md text-body-md text-on-surface">
-{/*  Row 1  */}
-<tr className="hover:bg-surface-container-lowest transition-colors">
+{data.categories.map(c => (
+<tr key={c.categoryId || 'uncat'} className="hover:bg-surface-container-lowest transition-colors">
 <td className="py-3 px-4 font-medium flex items-center gap-2">
-<span className="material-symbols-outlined text-outline text-[18px]">home</span>
-<span>Housing</span>
+<span className="material-symbols-outlined text-outline text-[18px]">sell</span>
+<span>{c.name}</span>
 </td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md">₹22,000.00</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md font-semibold text-primary-container">₹22,000.00</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md text-on-surface-variant">₹0.00</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md text-on-surface-variant">0.0%</td>
+<td className="py-3 px-4 text-right font-numeric-md text-numeric-md">₹{c.prevAmount.toLocaleString()}</td>
+<td className="py-3 px-4 text-right font-numeric-md text-numeric-md font-semibold text-primary-container">₹{c.amount.toLocaleString()}</td>
+<td className="py-3 px-4 text-right font-numeric-md text-numeric-md text-on-surface-variant">₹{(c.amount - c.prevAmount).toLocaleString()}</td>
+<td className="py-3 px-4 text-right font-numeric-md text-numeric-md text-on-surface-variant">{c.changePct !== null ? `${c.changePct > 0 ? '+' : ''}${c.changePct}%` : 'N/A'}</td>
 <td className="py-3 px-4 text-center">
-<span className="inline-block px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm uppercase">Constant</span>
+<span className="inline-block px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm uppercase">Active</span>
 </td>
 </tr>
-{/*  Row 2  */}
-<tr className="hover:bg-surface-container-lowest transition-colors">
-<td className="py-3 px-4 font-medium flex items-center gap-2">
-<span className="material-symbols-outlined text-outline text-[18px]">shopping_cart</span>
-<span>Groceries</span>
-</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md">₹10,150.00</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md font-semibold text-primary-container">₹9,800.00</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md text-secondary font-semibold">-₹350.00</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md text-secondary font-semibold">-3.4%</td>
-<td className="py-3 px-4 text-center">
-<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm uppercase">
-<span className="material-symbols-outlined text-[12px]">trending_down</span> Improved
-                </span>
-</td>
-</tr>
-{/*  Row 3  */}
-<tr className="hover:bg-surface-container-lowest transition-colors">
-<td className="py-3 px-4 font-medium flex items-center gap-2">
-<span className="material-symbols-outlined text-outline text-[18px]">restaurant</span>
-<span>Dining &amp; Food</span>
-</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md">₹6,800.00</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md font-semibold text-primary-container">₹6,450.00</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md text-secondary font-semibold">-₹350.00</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md text-secondary font-semibold">-5.1%</td>
-<td className="py-3 px-4 text-center">
-<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm uppercase">
-<span className="material-symbols-outlined text-[12px]">trending_down</span> Improved
-                </span>
-</td>
-</tr>
-{/*  Row 4  */}
-<tr className="hover:bg-surface-container-lowest transition-colors">
-<td className="py-3 px-4 font-medium flex items-center gap-2">
-<span className="material-symbols-outlined text-outline text-[18px]">bolt</span>
-<span>Utilities</span>
-</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md">₹4,400.00</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md font-semibold text-primary-container">₹4,640.00</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md text-on-surface font-semibold">+₹240.00</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md text-on-surface font-semibold">+5.5%</td>
-<td className="py-3 px-4 text-center">
-<span className="inline-block px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm uppercase">Within Cap</span>
-</td>
-</tr>
-{/*  Row 5  */}
-<tr className="hover:bg-surface-container-lowest transition-colors">
-<td className="py-3 px-4 font-medium flex items-center gap-2">
-<span className="material-symbols-outlined text-outline text-[18px]">movie</span>
-<span>Entertainment</span>
-</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md">₹2,800.00</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md font-semibold text-primary-container">₹3,100.00</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md text-error font-bold">+₹300.00</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md text-error font-bold">+10.7%</td>
-<td className="py-3 px-4 text-center">
-<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm uppercase font-semibold">
-<span className="material-symbols-outlined text-[12px]">priority_high</span> Over Limit
-                </span>
-</td>
-</tr>
-{/*  Row 6  */}
-<tr className="hover:bg-surface-container-lowest transition-colors">
-<td className="py-3 px-4 font-medium flex items-center gap-2">
-<span className="material-symbols-outlined text-outline text-[18px]">directions_car</span>
-<span>Transportation</span>
-</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md">₹3,450.00</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md font-semibold text-primary-container">₹3,200.00</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md text-secondary font-semibold">-₹250.00</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md text-secondary font-semibold">-7.2%</td>
-<td className="py-3 px-4 text-center">
-<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm uppercase">
-<span className="material-symbols-outlined text-[12px]">trending_down</span> Reduced
-                </span>
-</td>
-</tr>
-{/*  Row 7  */}
-<tr className="hover:bg-surface-container-lowest transition-colors">
-<td className="py-3 px-4 font-medium flex items-center gap-2">
-<span className="material-symbols-outlined text-outline text-[18px]">local_mall</span>
-<span>Shopping</span>
-</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md">₹11,500.00</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md font-semibold text-primary-container">₹4,590.50</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md text-secondary font-bold">-₹6,909.50</td>
-<td className="py-3 px-4 text-right font-numeric-md text-numeric-md text-secondary font-bold">-60.1%</td>
-<td className="py-3 px-4 text-center">
-<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm uppercase font-semibold">
-<span className="material-symbols-outlined text-[12px]">trending_down</span> Major Saver
-                </span>
-</td>
-</tr>
-{/*  Grand Total Aggregation Row  */}
+))}
 <tr className="bg-surface-container-high font-semibold text-primary-container">
 <td className="py-3.5 px-4 font-headline-sm text-headline-sm">Grand Total Expenditure</td>
-<td className="py-3.5 px-4 text-right font-numeric-lg text-numeric-lg text-on-surface-variant">₹61,100.00</td>
-<td className="py-3.5 px-4 text-right font-numeric-lg text-numeric-lg text-primary-container">₹54,280.50</td>
-<td className="py-3.5 px-4 text-right font-numeric-lg text-numeric-lg text-secondary">-₹6,819.50</td>
-<td className="py-3.5 px-4 text-right font-numeric-lg text-numeric-lg text-secondary">-11.2%</td>
+<td className="py-3.5 px-4 text-right font-numeric-lg text-numeric-lg text-on-surface-variant">₹{data.totals.previousExpense.toLocaleString()}</td>
+<td className="py-3.5 px-4 text-right font-numeric-lg text-numeric-lg text-primary-container">₹{data.totals.expense.toLocaleString()}</td>
+<td className="py-3.5 px-4 text-right font-numeric-lg text-numeric-lg text-secondary">₹{(data.totals.expense - data.totals.previousExpense).toLocaleString()}</td>
+<td className="py-3.5 px-4 text-right font-numeric-lg text-numeric-lg text-secondary">{data.totals.expenseChangePct !== null ? `${data.totals.expenseChangePct > 0 ? '+' : ''}${data.totals.expenseChangePct}%` : 'N/A'}</td>
 <td className="py-3.5 px-4 text-center">
-<span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary text-on-secondary font-label-sm text-label-sm uppercase">Overall Spend Cut</span>
 </td>
 </tr>
 </tbody>
@@ -393,7 +345,7 @@ export default function Report() {
 <div className="flex flex-col gap-1">
 <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Account Holder Attestation</span>
 <div className="h-10 flex items-end">
-<span className="font-headline-sm text-headline-sm italic text-primary-container font-serif">Arjun Patel</span>
+<span className="font-headline-sm text-headline-sm italic text-primary-container font-serif">{data.user ? data.user.name : "Demo User"}</span>
 </div>
 <div className="w-48 h-0.5 bg-surface-variant"></div>
 <span className="font-body-sm text-body-sm text-on-surface-variant">Arjun Patel (Primary Ledger Owner)</span>
