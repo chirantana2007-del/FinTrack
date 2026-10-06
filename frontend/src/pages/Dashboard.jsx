@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import NotificationBell from '../components/NotificationBell';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Chart as ChartJS,
@@ -209,6 +210,7 @@ export default function Dashboard() {
                 <span className="w-1.5 h-1.5 rounded-full bg-secondary"></span>
               </div>
             )}
+            <NotificationBell />
             <div className="h-6 w-px bg-surface-variant"></div>
             <div className="flex items-center gap-space-sm pl-space-xs">
               <img

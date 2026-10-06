@@ -10,7 +10,18 @@ jest.mock("../src/config/db", () => ({
   getConnection: jest.fn()
 }));
 
+// Subscription detection has its own tests; here we only check that the
+// upload triggers it and survives it failing.
+jest.mock("../src/services/subscription.service", () => ({
+  syncSubscriptions: jest.fn().mockResolvedValue([])
+}));
+jest.mock("../src/services/notification.service", () => ({
+  checkUpcomingSubscriptions: jest.fn().mockResolvedValue()
+}));
+
 const pool = require("../src/config/db");
+const { syncSubscriptions } = require("../src/services/subscription.service");
+const { checkUpcomingSubscriptions } = require("../src/services/notification.service");
 const uploadRoutes = require("../src/routes/upload.routes");
 const { errorHandler } = require("../src/middleware/errorHandler");
 
@@ -85,6 +96,49 @@ describe("CSV Upload", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.insertedCount).toBe(1);
+    expect(syncSubscriptions).toHaveBeenCalledWith(1);
+    expect(checkUpcomingSubscriptions).toHaveBeenCalledWith(1);
+  });
+
+  test("still succeeds if subscription detection fails after the rows are committed", async () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
+    syncSubscriptions.mockRejectedValueOnce(new Error("detection broke"));
+
+    const connection = {
+      beginTransaction: jest.fn().mockResolvedValue(),
+      commit: jest.fn().mockResolvedValue(),
+      rollback: jest.fn().mockResolvedValue(),
+      release: jest.fn(),
+      execute: sqlMock([
+        ["FROM Merchants WHERE canonical_name", () => [[]]],
+        ["INSERT INTO Merchants", () => [{ insertId: 10 }]],
+        ["FROM CategoryRules", () => [[]]],
+        ["INSERT INTO Transactions", () => [{ insertId: 1 }]]
+      ]),
+      query: sqlMock([
+        ["SELECT merchant_id, canonical_name", () => [[]]],
+        ["fn_categorize_transaction", () => [[{ category_id: null }]]]
+      ])
+    };
+
+    pool.execute = sqlMock([
+      ["FROM Accounts WHERE user_id = ? AND is_active", () => [[{ account_id: 3 }]]],
+      ["INSERT INTO UploadedFiles", () => [{ insertId: 42 }]],
+      ["SELECT transaction_date, description, amount FROM Transactions", () => [[]]],
+      ["UPDATE UploadedFiles", () => [{}]]
+    ]);
+    pool.getConnection.mockResolvedValue(connection);
+
+    const response = await request(app)
+      .post("/api/upload/csv")
+      .set("Authorization", `Bearer ${token}`)
+      .attach("file", Buffer.from("transaction_date,description,amount\n2026-01-01,TEST,500"), "test.csv");
+
+    expect(response.status).toBe(200);
+    expect(response.body.insertedCount).toBe(1);
+    expect(response.body.subscriptionsDetected).toBe(0);
+    expect(connection.commit).toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   test("should reject an account that doesn't belong to the user", async () => {

@@ -8,9 +8,16 @@
 --                                            -- one user/month (idempotent: safe to
 --                                            -- re-run, e.g. after a backfill or a
 --                                            -- correction to historical transactions)
+--   sp_check_upcoming_subscriptions(user_id) -- inserts a 'subscription_due' notification
+--                                            -- for each active subscription due within
+--                                            -- 3 days (NULL user_id = all users)
+--   evt_check_upcoming_subscriptions         -- hourly event that runs the check above
+--                                            -- (needs event_scheduler=ON, the MySQL 8 default)
 
+DROP EVENT IF EXISTS evt_check_upcoming_subscriptions;
 DROP FUNCTION IF EXISTS fn_categorize_transaction;
 DROP PROCEDURE IF EXISTS sp_generate_monthly_summary;
+DROP PROCEDURE IF EXISTS sp_check_upcoming_subscriptions;
 
 DELIMITER $$
 
@@ -77,5 +84,48 @@ proc_body: BEGIN
 
     COMMIT;
 END$$
+
+-- One reminder per subscription per billing cycle: a reminder already created
+-- on/after (next_due_date - 3 days) means this cycle has been notified. Once
+-- the next charge is uploaded, next_due_date moves forward and the window
+-- reopens for the following cycle.
+CREATE PROCEDURE sp_check_upcoming_subscriptions(IN p_user_id INT UNSIGNED)
+MODIFIES SQL DATA
+BEGIN
+    INSERT INTO Notifications (user_id, type, message, related_entity_type, related_entity_id)
+    SELECT
+        s.user_id,
+        'subscription_due',
+        CONCAT(
+            m.canonical_name, ' payment of INR ', FORMAT(s.amount, 2),
+            CASE DATEDIFF(s.next_due_date, CURDATE())
+                WHEN 0 THEN ' is due today.'
+                WHEN 1 THEN ' is due tomorrow.'
+                ELSE CONCAT(' is due on ', DATE_FORMAT(s.next_due_date, '%d %b %Y'), '.')
+            END
+        ),
+        'Subscription',
+        s.subscription_id
+    FROM Subscriptions s
+    INNER JOIN Merchants m ON m.merchant_id = s.merchant_id
+    WHERE s.is_active = 1
+      AND (p_user_id IS NULL OR s.user_id = p_user_id)
+      AND s.next_due_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 3 DAY)
+      AND NOT EXISTS (
+            SELECT 1
+            FROM Notifications n
+            WHERE n.user_id = s.user_id
+              AND n.type = 'subscription_due'
+              AND n.related_entity_type = 'Subscription'
+              AND n.related_entity_id = s.subscription_id
+              AND n.created_at >= DATE_SUB(s.next_due_date, INTERVAL 3 DAY)
+      );
+END$$
+
+CREATE EVENT evt_check_upcoming_subscriptions
+ON SCHEDULE EVERY 1 HOUR
+STARTS CURRENT_TIMESTAMP
+DO
+    CALL sp_check_upcoming_subscriptions(NULL)$$
 
 DELIMITER ;

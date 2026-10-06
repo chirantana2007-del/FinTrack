@@ -2,6 +2,8 @@ const pool = require("../config/db");
 const { parseStatement } = require("../services/parsing.service");
 const { resolveMerchant } = require("../services/merchant.service");
 const { categorizeTransaction } = require("../services/categorization.service");
+const { syncSubscriptions } = require("../services/subscription.service");
+const { checkUpcomingSubscriptions } = require("../services/notification.service");
 
 const uploadCsv = async (req, res) => {
   if (!req.file) {
@@ -119,12 +121,26 @@ const uploadCsv = async (req, res) => {
       [insertedCount, errors.length, errors.length > 0 ? JSON.stringify(errors) : null, uploadedFileId]
     );
 
+    // New rows can complete a recurring pattern, so re-run subscription
+    // detection and the due-soon check. Best-effort: the rows are already
+    // committed, so a failure here must not turn the upload into an error.
+    let subscriptionsDetected = 0;
+    if (insertedCount > 0) {
+      try {
+        subscriptionsDetected = (await syncSubscriptions(userId)).length;
+        await checkUpcomingSubscriptions(userId);
+      } catch (syncErr) {
+        console.error("Subscription detection after upload failed:", syncErr);
+      }
+    }
+
     return res.status(200).json({
       message: "Upload processed successfully",
       uploadedFileId,
       insertedCount,
       duplicateCount: duplicates.length,
       failedCount: errors.length,
+      subscriptionsDetected,
       errors
     });
   } catch (err) {
