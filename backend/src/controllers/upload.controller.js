@@ -4,6 +4,7 @@ const { resolveMerchant } = require("../services/merchant.service");
 const { categorizeTransaction } = require("../services/categorization.service");
 const { syncSubscriptions } = require("../services/subscription.service");
 const { checkUpcomingSubscriptions } = require("../services/notification.service");
+const { logAudit } = require("../services/audit.service");
 
 const uploadCsv = async (req, res) => {
   if (!req.file) {
@@ -134,6 +135,19 @@ const uploadCsv = async (req, res) => {
       }
     }
 
+    await logAudit({
+      userId,
+      action: "upload.completed",
+      entityType: "UploadedFile",
+      entityId: uploadedFileId,
+      details: {
+        filename: req.file.originalname,
+        inserted: insertedCount,
+        duplicates: duplicates.length,
+        failed: errors.length
+      }
+    });
+
     return res.status(200).json({
       message: "Upload processed successfully",
       uploadedFileId,
@@ -154,6 +168,13 @@ const uploadCsv = async (req, res) => {
     );
 
     console.error("Upload processing error:", err);
+    await logAudit({
+      userId,
+      action: "upload.failed",
+      entityType: "UploadedFile",
+      entityId: uploadedFileId,
+      details: { filename: req.file.originalname, error: err.message || "Unknown error" }
+    });
     return res.status(500).json({ message: "Failed to process upload; no rows were saved" });
   } finally {
     connection.release();

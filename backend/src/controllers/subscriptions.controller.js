@@ -1,5 +1,6 @@
 const pool = require("../config/db");
 const { syncSubscriptions } = require("../services/subscription.service");
+const { logAudit } = require("../services/audit.service");
 
 const listSubscriptions = async (req, res) => {
     const includeInactive = req.query.all === "1" || req.query.all === "true";
@@ -48,6 +49,13 @@ const updateSubscription = async (req, res) => {
     if (result.affectedRows === 0) {
         return res.status(404).json({ message: "Subscription not found" });
     }
+
+    await logAudit({
+        userId: req.user.id,
+        action: isActive ? "subscription.resumed" : "subscription.stopped",
+        entityType: "Subscription",
+        entityId: Number(req.params.id)
+    });
 
     return res.json({ subscription_id: Number(req.params.id), is_active: isActive });
 };

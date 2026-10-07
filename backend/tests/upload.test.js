@@ -18,10 +18,14 @@ jest.mock("../src/services/subscription.service", () => ({
 jest.mock("../src/services/notification.service", () => ({
   checkUpcomingSubscriptions: jest.fn().mockResolvedValue()
 }));
+jest.mock("../src/services/audit.service", () => ({
+  logAudit: jest.fn().mockResolvedValue()
+}));
 
 const pool = require("../src/config/db");
 const { syncSubscriptions } = require("../src/services/subscription.service");
 const { checkUpcomingSubscriptions } = require("../src/services/notification.service");
+const { logAudit } = require("../src/services/audit.service");
 const uploadRoutes = require("../src/routes/upload.routes");
 const { errorHandler } = require("../src/middleware/errorHandler");
 
@@ -98,6 +102,9 @@ describe("CSV Upload", () => {
     expect(response.body.insertedCount).toBe(1);
     expect(syncSubscriptions).toHaveBeenCalledWith(1);
     expect(checkUpcomingSubscriptions).toHaveBeenCalledWith(1);
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 1, action: "upload.completed", entityId: 42 })
+    );
   });
 
   test("still succeeds if subscription detection fails after the rows are committed", async () => {
@@ -322,5 +329,6 @@ not-a-date,BAD ROW,abc`;
     expect(response.status).toBe(500);
     expect(connection.rollback).toHaveBeenCalled();
     expect(connection.commit).not.toHaveBeenCalled();
+    expect(logAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "upload.failed" }));
   });
 });

@@ -7,7 +7,9 @@ import Dashboard from './pages/Dashboard';
 import Budgets from './pages/Budgets';
 import Insights from './pages/Insights';
 import Report from './pages/Report';
+import Admin from './pages/Admin';
 import ProtectedRoute from './ProtectedRoute';
+import AdminRoute from './AdminRoute';
 
 function App() {
   const [darkMode, setDarkMode] = React.useState(() => {
@@ -36,6 +38,7 @@ function App() {
           <Route path="/budgets" element={<ProtectedRoute><Budgets /></ProtectedRoute>} />
           <Route path="/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
           <Route path="/report" element={<ProtectedRoute><Report /></ProtectedRoute>} />
+          <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
         </Routes>
       </BrowserRouter>
       <button

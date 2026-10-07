@@ -23,6 +23,7 @@ app.use('/api/reports', require('./routes/reports.routes'));
 app.use('/api/goals', require('./routes/goals.routes'));
 app.use('/api/subscriptions', require('./routes/subscriptions.routes'));
 app.use('/api/notifications', require('./routes/notifications.routes'));
+app.use('/api/admin', require('./routes/admin.routes'));
 
 // Remaining feature routes are mounted here as each one is implemented.
 // See IMPLEMENTATION_PLAN.md section 6 for the full task list.

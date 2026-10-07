@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import NotificationBell from '../components/NotificationBell';
+import AdminNavLink from '../components/AdminNavLink';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Chart as ChartJS,
@@ -251,6 +252,7 @@ export default function Dashboard() {
                 </Link>
               );
             })}
+            <AdminNavLink />
           </nav>
         </div>
         <div className="px-space-sm flex flex-col gap-space-xs pt-space-md bg-surface-container-lowest">

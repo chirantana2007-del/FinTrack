@@ -1,6 +1,7 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const pool = require("../config/db");
+const { logAudit } = require("../services/audit.service");
 
 const register = async (req, res) => {
   try {
@@ -57,6 +58,8 @@ const register = async (req, res) => {
       connection.release();
     }
 
+    await logAudit({ userId, action: "auth.register", entityType: "User", entityId: userId });
+
     return res.status(201).json({
       message: "Registration successful",
       user: {
@@ -89,6 +92,7 @@ const login = async (req, res) => {
     );
 
     if (users.length === 0) {
+      await logAudit({ action: "auth.login_failed", details: { email, reason: "unknown_email" } });
       return res.status(401).json({
         message: "Invalid email or password"
       });
@@ -102,6 +106,13 @@ const login = async (req, res) => {
     );
 
     if (!passwordMatch) {
+      await logAudit({
+        userId: user.user_id,
+        action: "auth.login_failed",
+        entityType: "User",
+        entityId: user.user_id,
+        details: { reason: "wrong_password" }
+      });
       return res.status(401).json({
         message: "Invalid email or password"
       });
@@ -116,6 +127,8 @@ const login = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "24h" }
     );
+
+    await logAudit({ userId: user.user_id, action: "auth.login", entityType: "User", entityId: user.user_id });
 
     return res.status(200).json({
       message: "Login successful",
