@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import NotificationBell from '../components/NotificationBell';
 import AdminNavLink from '../components/AdminNavLink';
+import { GoalFormModal, ContributeModal, GoalCardActions } from '../components/GoalDialogs';
 import apiClient from '../api/client';
 
 function currentMonthValue() {
@@ -24,12 +25,21 @@ export default function Budgets() {
   const [periodMonth, setPeriodMonth] = useState(currentMonthValue());
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
+  // null, or { type: 'form' | 'contribute', goal } for the open goal dialog.
+  const [goalDialog, setGoalDialog] = useState(null);
 
-  const loadBudgets = () => {
+  const loadGoals = () => {
+    apiClient.get('/goals').then(res => setGoals(res.data.data)).catch(console.error);
+  };
+
+  // Month whose budgets are listed (YYYY-MM); the API defaults to the current month.
+  const [viewMonth, setViewMonth] = useState(currentMonthValue());
+
+  const loadBudgets = (month = viewMonth) => {
     setLoading(true);
     setError('');
     apiClient
-      .get('/budgets')
+      .get('/budgets', { params: { month } })
       .then((response) => setBudgets(response.data.budgets))
       .catch((err) => setError(err.response?.data?.message || 'Failed to load budgets'))
       .finally(() => setLoading(false));
@@ -37,7 +47,7 @@ export default function Budgets() {
 
   useEffect(() => {
     loadBudgets();
-    apiClient.get('/goals').then(res => setGoals(res.data.data)).catch(console.error);
+    loadGoals();
     apiClient.get('/categories').then((response) => {
       setCategories(response.data.categories.filter((c) => c.type === 'expense'));
     }).catch(() => {});
@@ -56,7 +66,9 @@ export default function Budgets() {
       setCategoryId('');
       setLimitAmount('');
       setShowCreateForm(false);
-      loadBudgets();
+      // Show the month the budget was created for, so it doesn't seem to vanish.
+      setViewMonth(periodMonth);
+      loadBudgets(periodMonth);
     } catch (err) {
       setCreateError(err.response?.data?.message || 'Failed to create budget');
     } finally {
@@ -227,6 +239,17 @@ export default function Budgets() {
 <h3 className="font-headline-sm text-headline-sm text-on-surface">Category Allocations &amp; Thresholds</h3>
 <span className="px-2 py-0.5 rounded-full bg-surface-container font-numeric-sm text-numeric-sm text-outline">{budgets.length} Rules Evaluated</span>
 </div>
+<input
+  type="month"
+  value={viewMonth}
+  onChange={(e) => {
+    if (!e.target.value) return;
+    setViewMonth(e.target.value);
+    loadBudgets(e.target.value);
+  }}
+  aria-label="Show budgets for month"
+  className="bg-surface-container-low px-3 py-1.5 rounded-lg font-body-sm text-body-sm text-on-surface outline-none focus:ring-1 focus:ring-primary-container shadow-sm"
+/>
 </div>
 {showCreateForm && (
 <form onSubmit={handleCreateBudget} className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col sm:flex-row items-end gap-space-sm">
@@ -262,7 +285,7 @@ export default function Budgets() {
 <p className="font-body-md text-body-md text-error col-span-full">{error}</p>
 )}
 {!loading && !error && budgets.length === 0 && (
-<p className="font-body-md text-body-md text-on-surface-variant col-span-full">No budgets set for this month yet. Create one above.</p>
+<p className="font-body-md text-body-md text-on-surface-variant col-span-full">No budgets set for {new Date(`${viewMonth}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })} yet. Create one above, or pick another month.</p>
 )}
 {!loading && !error && budgets.map((b) => {
   const pct = Number(b.progress_pct);
@@ -329,7 +352,7 @@ export default function Budgets() {
 </div>
 <span className="font-body-sm text-body-sm text-on-surface-variant">Earmarked balance allocations backed by dedicated recurring monthly schedules.</span>
 </div>
-<button className="self-start sm:self-auto px-space-md py-1.5 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-md text-label-md shadow-sm transition-colors flex items-center gap-1.5" id="open-goal-btn">
+<button onClick={() => setGoalDialog({ type: 'form', goal: null })} type="button" className="self-start sm:self-auto px-space-md py-1.5 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-md text-label-md shadow-sm transition-colors flex items-center gap-1.5" id="open-goal-btn">
 <span className="material-symbols-outlined text-[18px] text-secondary">add</span>
 <span>+ New Goal</span>
 </button>
@@ -401,6 +424,12 @@ export default function Budgets() {
           </div>
         </div>
       </div>
+      <GoalCardActions
+        goal={goal}
+        onEdit={() => setGoalDialog({ type: 'form', goal })}
+        onContribute={() => setGoalDialog({ type: 'contribute', goal })}
+        onDeleted={loadGoals}
+      />
     </div>
   );
 })}
@@ -467,6 +496,12 @@ export default function Budgets() {
 {/*  Client-side Micro-interactions  */}
 
 </div></main></div>
+      {goalDialog?.type === 'form' && (
+        <GoalFormModal goal={goalDialog.goal} onClose={() => setGoalDialog(null)} onSaved={loadGoals} />
+      )}
+      {goalDialog?.type === 'contribute' && (
+        <ContributeModal goal={goalDialog.goal} onClose={() => setGoalDialog(null)} onSaved={loadGoals} />
+      )}
     </>
   );
 }
