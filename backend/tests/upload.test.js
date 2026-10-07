@@ -332,3 +332,33 @@ not-a-date,BAD ROW,abc`;
     expect(logAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "upload.failed" }));
   });
 });
+
+describe("Upload history", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test("requires auth", async () => {
+    const response = await request(app).get("/api/upload/history");
+    expect(response.status).toBe(401);
+  });
+
+  test("returns only the user's uploads with totals and the active rule count", async () => {
+    pool.execute = sqlMock([
+      ["FROM UploadedFiles f", () => [[{ file_id: 7, original_filename: "demo_statement.csv", status: "completed" }]]],
+      ["COUNT(*) AS uploadCount", () => [[{ uploadCount: 1, rowsImported: 21 }]]],
+      ["FROM CategoryRules", () => [[{ activeRuleCount: 48 }]]]
+    ]);
+
+    const response = await request(app)
+      .get("/api/upload/history")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ uploadCount: 1, rowsImported: 21, activeRuleCount: 48 });
+    expect(response.body.uploads[0].file_id).toBe(7);
+    for (const [, params] of pool.execute.mock.calls) {
+      expect(params).toEqual([1]);
+    }
+  });
+});

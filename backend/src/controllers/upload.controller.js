@@ -181,4 +181,39 @@ const uploadCsv = async (req, res) => {
   }
 };
 
-module.exports = { uploadCsv };
+const HISTORY_LIMIT = 50;
+
+// The signed-in user's own upload history for the Upload page, plus the
+// figures its summary strip shows. Admins see everyone's via /api/admin/uploads.
+const listMyUploads = async (req, res) => {
+  const [uploads] = await pool.execute(
+    `SELECT f.file_id, f.original_filename, f.status, f.total_rows, f.inserted_rows, f.failed_rows,
+            LEFT(f.error_log, 1000) AS error_log, f.uploaded_at, f.processed_at,
+            a.account_name
+     FROM UploadedFiles f
+     LEFT JOIN Accounts a ON a.account_id = f.account_id
+     WHERE f.user_id = ?
+     ORDER BY f.uploaded_at DESC, f.file_id DESC
+     LIMIT ${HISTORY_LIMIT}`,
+    [req.user.id]
+  );
+
+  const [[totals]] = await pool.execute(
+    `SELECT COUNT(*) AS uploadCount,
+            COALESCE(SUM(CASE WHEN status = 'completed' THEN inserted_rows ELSE 0 END), 0) AS rowsImported
+     FROM UploadedFiles
+     WHERE user_id = ?`,
+    [req.user.id]
+  );
+
+  const [[{ activeRuleCount }]] = await pool.execute(
+    `SELECT COUNT(*) AS activeRuleCount
+     FROM CategoryRules
+     WHERE is_active = 1 AND (user_id IS NULL OR user_id = ?)`,
+    [req.user.id]
+  );
+
+  return res.json({ uploads, ...totals, activeRuleCount });
+};
+
+module.exports = { uploadCsv, listMyUploads };

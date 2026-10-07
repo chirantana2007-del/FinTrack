@@ -21,6 +21,7 @@ const TABS = [
 ];
 
 const PAGE_SIZE = 25;
+const AUTO_REFRESH_MS = 30 * 1000;
 
 const STATUS_STYLES = {
   completed: 'bg-secondary-container text-on-secondary-container',
@@ -100,16 +101,18 @@ function TableShell({ columns, loading, error, empty, children }) {
           </tr>
         </thead>
         <tbody className="text-on-surface font-body-md text-body-md">
-          {loading && (
+          {/* Background refreshes keep the current rows on screen instead of
+              flashing "Loading…" every 30 seconds. */}
+          {loading && empty && (
             <tr><td colSpan={columns.length} className="py-space-lg text-center text-on-surface-variant">Loading…</td></tr>
           )}
-          {!loading && error && (
+          {error && (
             <tr><td colSpan={columns.length} className="py-space-lg text-center text-error" role="alert">{error}</td></tr>
           )}
           {!loading && !error && empty && (
             <tr><td colSpan={columns.length} className="py-space-lg text-center text-on-surface-variant">Nothing to show.</td></tr>
           )}
-          {!loading && !error && children}
+          {!error && children}
         </tbody>
       </table>
     </div>
@@ -119,7 +122,8 @@ function TableShell({ columns, loading, error, empty, children }) {
 const inputClass = 'px-3 py-1.5 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-primary-container';
 
 // Shared fetch + paging state for the three tables.
-function useAdminList(path, filters) {
+// refreshKey changes on Refresh clicks and auto-refresh ticks.
+function useAdminList(path, filters, refreshKey) {
   const [state, setState] = useState({ rows: [], total: 0, loading: true, error: '' });
   const filterKey = JSON.stringify(filters);
   // Paging is tied to the filters it was set under, so changing a filter
@@ -130,7 +134,7 @@ function useAdminList(path, filters) {
 
   useEffect(() => {
     let cancelled = false;
-    setState((s) => ({ ...s, loading: true, error: '' }));
+    setState((s) => ({ ...s, loading: true }));
     apiClient
       .get(path, { params: { ...JSON.parse(filterKey), limit: PAGE_SIZE, offset } })
       .then(({ data }) => {
@@ -145,16 +149,16 @@ function useAdminList(path, filters) {
     return () => {
       cancelled = true;
     };
-  }, [path, filterKey, offset]);
+  }, [path, filterKey, offset, refreshKey]);
 
   return { ...state, offset, setOffset };
 }
 
-function UsersTab() {
+function UsersTab({ refreshKey }) {
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [role, setRole] = useState('');
-  const list = useAdminList('/admin/users', { search: query || undefined, role: role || undefined });
+  const list = useAdminList('/admin/users', { search: query || undefined, role: role || undefined }, refreshKey);
 
   return (
     <>
@@ -209,10 +213,10 @@ function UsersTab() {
   );
 }
 
-function UploadsTab() {
+function UploadsTab({ refreshKey }) {
   const [status, setStatus] = useState('');
   const [expanded, setExpanded] = useState(null);
-  const list = useAdminList('/admin/uploads', { status: status || undefined });
+  const list = useAdminList('/admin/uploads', { status: status || undefined }, refreshKey);
 
   return (
     <>
@@ -285,9 +289,9 @@ const ACTION_STYLES = {
   'upload.completed': STATUS_STYLES.completed,
 };
 
-function AuditTab() {
+function AuditTab({ refreshKey }) {
   const [action, setAction] = useState('');
-  const list = useAdminList('/admin/audit-log', { action: action || undefined });
+  const list = useAdminList('/admin/audit-log', { action: action || undefined }, refreshKey);
 
   return (
     <>
@@ -335,6 +339,8 @@ export default function Admin() {
   const [tab, setTab] = useState('users');
   const [stats, setStats] = useState(null);
   const [statsError, setStatsError] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   const loadStats = useCallback(() => {
     apiClient
@@ -342,13 +348,22 @@ export default function Admin() {
       .then(({ data }) => {
         setStats(data);
         setStatsError('');
+        setLastUpdated(new Date());
       })
       .catch((err) => setStatsError(err.response?.data?.message || 'Could not load platform stats.'));
   }, []);
 
+  // Reloads the stat tiles and whichever table tab is open.
+  const refresh = useCallback(() => {
+    loadStats();
+    setRefreshKey((key) => key + 1);
+  }, [loadStats]);
+
   useEffect(() => {
     loadStats();
-  }, [loadStats]);
+    const timer = setInterval(refresh, AUTO_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [loadStats, refresh]);
 
   const t = stats?.totals;
 
@@ -421,14 +436,21 @@ export default function Admin() {
                 <h1 className="font-headline-lg text-headline-lg text-primary-container tracking-tight">Admin Console</h1>
                 <p className="font-body-md text-body-md text-on-surface-variant">Platform users, statement uploads and the audit trail.</p>
               </div>
-              <button
-                type="button"
-                onClick={loadStats}
-                className="self-start md:self-auto inline-flex items-center gap-space-xs px-space-md py-2 rounded-lg bg-primary-container text-on-primary font-label-md text-label-md font-semibold"
-              >
-                <span className="material-symbols-outlined text-[18px]">refresh</span>
-                Refresh
-              </button>
+              <div className="flex flex-col items-start md:items-end gap-1 self-start md:self-auto">
+                <button
+                  type="button"
+                  onClick={refresh}
+                  className="inline-flex items-center gap-space-xs px-space-md py-2 rounded-lg bg-primary-container text-on-primary font-label-md text-label-md font-semibold"
+                >
+                  <span className="material-symbols-outlined text-[18px]">refresh</span>
+                  Refresh
+                </button>
+                {lastUpdated && (
+                  <span className="font-label-sm text-label-sm text-outline">
+                    Updated {lastUpdated.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} · auto every 30s
+                  </span>
+                )}
+              </div>
             </div>
 
             {statsError && <p role="alert" className="font-body-sm text-body-sm text-error">{statsError}</p>}
@@ -460,9 +482,9 @@ export default function Admin() {
                   </button>
                 ))}
               </div>
-              {tab === 'users' && <UsersTab />}
-              {tab === 'uploads' && <UploadsTab />}
-              {tab === 'audit' && <AuditTab />}
+              {tab === 'users' && <UsersTab refreshKey={refreshKey} />}
+              {tab === 'uploads' && <UploadsTab refreshKey={refreshKey} />}
+              {tab === 'audit' && <AuditTab refreshKey={refreshKey} />}
             </div>
           </div>
         </main>
