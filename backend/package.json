@@ -9,7 +9,9 @@
     "dev": "nodemon src/server.js",
     "test": "jest --runInBand",
     "test:integration": "jest --config jest.integration.config.js --runInBand",
-    "bench:indexes": "node scripts/index-benchmark.js"
+    "bench:indexes": "node scripts/index-benchmark.js",
+    "db:backup": "node scripts/db-backup.js",
+    "drill:backup": "node scripts/backup-drill.js"
   },
   "jest": {
     "testPathIgnorePatterns": [
