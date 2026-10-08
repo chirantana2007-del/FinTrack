@@ -2,6 +2,9 @@ const pool = require("../config/db");
 const { parseStatement } = require("../services/parsing.service");
 const { resolveMerchant } = require("../services/merchant.service");
 const { categorizeTransaction } = require("../services/categorization.service");
+const { syncSubscriptions } = require("../services/subscription.service");
+const { checkUpcomingSubscriptions } = require("../services/notification.service");
+const { logAudit } = require("../services/audit.service");
 
 const uploadCsv = async (req, res) => {
   if (!req.file) {
@@ -119,12 +122,39 @@ const uploadCsv = async (req, res) => {
       [insertedCount, errors.length, errors.length > 0 ? JSON.stringify(errors) : null, uploadedFileId]
     );
 
+    // New rows can complete a recurring pattern, so re-run subscription
+    // detection and the due-soon check. Best-effort: the rows are already
+    // committed, so a failure here must not turn the upload into an error.
+    let subscriptionsDetected = 0;
+    if (insertedCount > 0) {
+      try {
+        subscriptionsDetected = (await syncSubscriptions(userId)).length;
+        await checkUpcomingSubscriptions(userId);
+      } catch (syncErr) {
+        console.error("Subscription detection after upload failed:", syncErr);
+      }
+    }
+
+    await logAudit({
+      userId,
+      action: "upload.completed",
+      entityType: "UploadedFile",
+      entityId: uploadedFileId,
+      details: {
+        filename: req.file.originalname,
+        inserted: insertedCount,
+        duplicates: duplicates.length,
+        failed: errors.length
+      }
+    });
+
     return res.status(200).json({
       message: "Upload processed successfully",
       uploadedFileId,
       insertedCount,
       duplicateCount: duplicates.length,
       failedCount: errors.length,
+      subscriptionsDetected,
       errors
     });
   } catch (err) {
@@ -138,10 +168,52 @@ const uploadCsv = async (req, res) => {
     );
 
     console.error("Upload processing error:", err);
+    await logAudit({
+      userId,
+      action: "upload.failed",
+      entityType: "UploadedFile",
+      entityId: uploadedFileId,
+      details: { filename: req.file.originalname, error: err.message || "Unknown error" }
+    });
     return res.status(500).json({ message: "Failed to process upload; no rows were saved" });
   } finally {
     connection.release();
   }
 };
 
-module.exports = { uploadCsv };
+const HISTORY_LIMIT = 50;
+
+// The signed-in user's own upload history for the Upload page, plus the
+// figures its summary strip shows. Admins see everyone's via /api/admin/uploads.
+const listMyUploads = async (req, res) => {
+  const [uploads] = await pool.execute(
+    `SELECT f.file_id, f.original_filename, f.status, f.total_rows, f.inserted_rows, f.failed_rows,
+            LEFT(f.error_log, 1000) AS error_log, f.uploaded_at, f.processed_at,
+            a.account_name
+     FROM UploadedFiles f
+     LEFT JOIN Accounts a ON a.account_id = f.account_id
+     WHERE f.user_id = ?
+     ORDER BY f.uploaded_at DESC, f.file_id DESC
+     LIMIT ${HISTORY_LIMIT}`,
+    [req.user.id]
+  );
+
+  const [[totals]] = await pool.execute(
+    `SELECT COUNT(*) AS uploadCount,
+            COALESCE(SUM(CASE WHEN status = 'completed' THEN inserted_rows ELSE 0 END), 0) AS rowsImported
+     FROM UploadedFiles
+     WHERE user_id = ?`,
+    [req.user.id]
+  );
+
+  const [[{ activeRuleCount }]] = await pool.execute(
+    `SELECT COUNT(*) AS activeRuleCount
+     FROM CategoryRules
+     WHERE is_active = 1 AND (user_id IS NULL OR user_id = ?)`,
+    [req.user.id]
+  );
+
+  return res.json({ uploads, ...totals, activeRuleCount });
+};
+
+module.exports = { uploadCsv, listMyUploads };

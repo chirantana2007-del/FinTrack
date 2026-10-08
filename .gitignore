@@ -1,5 +1,7 @@
 node_modules/
 .env
+# Database backups contain user data and password hashes
+backups/
 dist/
 build/
 *.log

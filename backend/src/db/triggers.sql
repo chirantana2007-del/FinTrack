@@ -29,6 +29,7 @@ trig_body: BEGIN
     DECLARE v_expense_delta DECIMAL(14,2) DEFAULT 0;
     DECLARE v_threshold_pct DECIMAL(5,2) DEFAULT 80.00;
     DECLARE v_threshold_amount DECIMAL(14,2) DEFAULT NULL;
+    DECLARE v_category_name VARCHAR(100) DEFAULT NULL;
 
     SELECT user_id INTO v_user_id FROM Accounts WHERE account_id = NEW.account_id;
     SET v_period_start = DATE_FORMAT(NEW.transaction_date, '%Y-%m-01');
@@ -96,6 +97,9 @@ trig_body: BEGIN
     SET v_expense_delta = -NEW.amount;
     SET v_prior_spent = v_spent - v_expense_delta;
 
+    SELECT name INTO v_category_name FROM Categories WHERE category_id = NEW.category_id;
+    SET v_category_name = COALESCE(v_category_name, CONCAT('category ', NEW.category_id));
+
     -- Two independent crossing checks, each guarded so it fires exactly once
     -- (on the transaction that causes the crossing), not on every transaction
     -- afterwards:
@@ -109,7 +113,7 @@ trig_body: BEGIN
             v_user_id,
             'budget_alert',
             CONCAT(
-                'Budget threshold reached for category ', NEW.category_id, ': ',
+                'Budget threshold reached for ', v_category_name, ': ',
                 ROUND((v_spent / v_budget_limit) * 100, 1), '% of limit used.'
             ),
             'Budget',
@@ -123,7 +127,7 @@ trig_body: BEGIN
             v_user_id,
             'budget_alert',
             CONCAT(
-                'Budget exceeded for category ', NEW.category_id, ': ',
+                'Budget exceeded for ', v_category_name, ': ',
                 ROUND((v_spent / v_budget_limit) * 100, 1), '% of limit used.'
             ),
             'Budget',
