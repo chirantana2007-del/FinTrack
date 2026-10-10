@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import NotificationBell from '../components/NotificationBell';
 import AdminNavLink from '../components/AdminNavLink';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Chart as ChartJS,
   ArcElement,
@@ -121,7 +121,13 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const user = getUser();
   const [data, setData] = useState(null);
-  const [month, setMonth] = useState(null); // null = let the server pick
+  // The selected month lives in the URL (?month=YYYY-MM) so it survives a
+  // refresh and works with Back/Forward and bookmarks. No (or an invalid)
+  // ?month = let the server pick.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const monthParam = searchParams.get('month');
+  const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(monthParam || '') ? monthParam : null;
+  const setMonth = (value) => setSearchParams({ month: value.slice(0, 7) });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -346,7 +352,12 @@ export default function Dashboard() {
               onChange={(e) => setMonth(e.target.value)}
               className="appearance-none pl-10 pr-8 py-1.5 bg-surface-container-lowest text-primary-container font-label-md text-label-md font-semibold rounded-lg shadow-sm hover:bg-surface-container-low transition-colors outline-none cursor-pointer"
             >
-              {(data.availableMonths.length ? data.availableMonths : [period.month]).map((m) => (
+              {/* A month from the URL may have no transactions; keep it listed so the
+                  picker shows the month actually on screen. */}
+              {(data.availableMonths.includes(period.month)
+                ? data.availableMonths
+                : [...data.availableMonths, period.month].sort().reverse()
+              ).map((m) => (
                 <option key={m} value={m}>{monthText(m)}</option>
               ))}
             </select>

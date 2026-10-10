@@ -228,6 +228,34 @@ describe("Re-uploading the same statement", () => {
   });
 });
 
+describe("Rows MySQL would reject", () => {
+  // In strict mode MySQL refuses an impossible date or an over-long
+  // description, and the upload runs in one transaction, so before the parser
+  // checked these, one such row rolled back the entire file.
+  test("are skipped as row errors while the rest of the file is saved", async () => {
+    const file = Buffer.from(
+      [
+        "transaction_date,description,amount",
+        "2026-08-03,STRICT MODE GOOD ROW ONE,-210",
+        "2026-02-30,IMPOSSIBLE DATE,-99",
+        `2026-08-04,${"X".repeat(300)},-50`,
+        "2026-08-05,STRICT MODE GOOD ROW TWO,-320"
+      ].join("\n")
+    );
+
+    const response = await auth(request(app).post("/api/upload/csv")).attach("file", file, "strict_mode.csv");
+
+    expect(response.status).toBe(200);
+    expect(response.body.insertedCount).toBe(2);
+    expect(response.body.errors.map((e) => e.row)).toEqual([3, 4]);
+    const [[saved]] = await pool.query(
+      "SELECT COUNT(*) AS n FROM Transactions WHERE account_id = ? AND description LIKE 'STRICT MODE GOOD ROW %'",
+      [accountId]
+    );
+    expect(saved.n).toBe(2);
+  });
+});
+
 describe("Subscription detection after upload", () => {
   let response;
 
