@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../api/client';
-import { getUser } from '../api/auth';
+import { ProfileChip } from '../components/ShellWidgets';
 import NotificationBell from '../components/NotificationBell';
 import AdminNavLink from '../components/AdminNavLink';
 
@@ -18,6 +18,7 @@ const TABS = [
   { key: 'users', label: 'Users', icon: 'group' },
   { key: 'uploads', label: 'Uploads', icon: 'upload_file' },
   { key: 'audit', label: 'Audit Log', icon: 'history' },
+  { key: 'database', label: 'Database', icon: 'database' },
 ];
 
 const PAGE_SIZE = 25;
@@ -334,8 +335,297 @@ function AuditTab({ refreshKey }) {
   );
 }
 
+const inr = (value) => `₹${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+
+function monthName(monthStart) {
+  const [year, month] = String(monthStart).split('-').map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+}
+
+// "12 min ago" / "in 48 min" relative to the database server's clock.
+function relativeTime(value, serverTime) {
+  if (!value || !serverTime) return '';
+  const diffMin = Math.round(
+    (new Date(String(value).replace(' ', 'T')) - new Date(String(serverTime).replace(' ', 'T'))) / 60000
+  );
+  const abs = Math.abs(diffMin);
+  const text = abs < 1 ? 'less than a minute' : abs < 60 ? `${abs} min` : `${Math.floor(abs / 60)} h ${abs % 60} min`;
+  return diffMin <= 0 ? `${text} ago` : `in ${text}`;
+}
+
+function Section({ title, icon, children, aside }) {
+  return (
+    <div className="flex flex-col gap-space-sm">
+      <div className="flex items-center justify-between gap-space-sm">
+        <div className="flex items-center gap-space-xs">
+          <span className="material-symbols-outlined text-primary-container text-[20px]">{icon}</span>
+          <h3 className="font-headline-sm text-headline-sm text-primary-container font-semibold">{title}</h3>
+        </div>
+        {aside}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// Database health: the event scheduler, events, routines and trigger, a
+// Transactions-vs-MonthlySummary consistency check, and two buttons that run
+// the stored procedures on demand.
+function DatabaseTab({ refreshKey, onChanged }) {
+  const [health, setHealth] = useState(null);
+  const [error, setError] = useState('');
+  const [dueResult, setDueResult] = useState(null);
+  const [dueBusy, setDueBusy] = useState(false);
+  const [rebuildMonth, setRebuildMonth] = useState('');
+  const [rebuildResult, setRebuildResult] = useState(null);
+  const [rebuildBusy, setRebuildBusy] = useState(false);
+  const [actionError, setActionError] = useState('');
+
+  const load = useCallback(() => {
+    apiClient
+      .get('/admin/database')
+      .then(({ data }) => {
+        setHealth(data);
+        setError('');
+      })
+      .catch((err) => setError(err.response?.data?.message || 'Could not load database health.'));
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load, refreshKey]);
+
+  const runDueCheck = async () => {
+    setDueBusy(true);
+    setActionError('');
+    try {
+      const { data } = await apiClient.post('/admin/database/run-due-check');
+      setDueResult({ ...data, at: new Date() });
+      load();
+      onChanged();
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'The due-soon check failed.');
+    } finally {
+      setDueBusy(false);
+    }
+  };
+
+  const rebuild = async () => {
+    const month = rebuildMonth || health?.consistency[0]?.month;
+    if (!month) return;
+    setRebuildBusy(true);
+    setActionError('');
+    try {
+      const { data } = await apiClient.post('/admin/database/rebuild-summary', { month: month.slice(0, 7) });
+      setRebuildResult(data);
+      load();
+      onChanged();
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'The rebuild failed.');
+    } finally {
+      setRebuildBusy(false);
+    }
+  };
+
+  if (error) return <p role="alert" className="px-space-md pb-space-md font-body-sm text-body-sm text-error">{error}</p>;
+  if (!health) return <p className="px-space-md pb-space-lg text-center font-body-sm text-body-sm text-on-surface-variant">Loading…</p>;
+
+  const schedulerOn = health.scheduler === 'ON';
+  const mismatchedMonths = health.consistency.filter((c) => c.mismatches > 0).length;
+  const months = health.consistency.map((c) => c.month);
+  const selectedMonth = rebuildMonth || months[0] || '';
+  const buttonClass =
+    'inline-flex items-center gap-space-xs px-space-md py-2 rounded-lg bg-primary-container text-on-primary font-label-md text-label-md font-semibold disabled:opacity-60';
+
+  return (
+    <div className="flex flex-col gap-space-lg px-space-md pb-space-lg">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-space-md">
+        <StatTile
+          icon="schedule"
+          label="Event scheduler"
+          value={schedulerOn ? 'ON' : 'OFF'}
+          tone={schedulerOn ? undefined : 'bad'}
+          sub={schedulerOn ? 'MySQL runs scheduled events automatically' : 'Events will not run until it is turned on'}
+        />
+        <StatTile
+          icon="database"
+          label="Database objects"
+          value={num(health.events.length + health.routines.length + health.triggers.length)}
+          sub={`${health.events.length} event · ${health.routines.length} routines · ${health.triggers.length} trigger`}
+        />
+        <StatTile
+          icon={mismatchedMonths ? 'error' : 'verified'}
+          label="Summary consistency"
+          value={mismatchedMonths ? `${mismatchedMonths} month${mismatchedMonths === 1 ? '' : 's'} off` : 'All match'}
+          tone={mismatchedMonths ? 'bad' : undefined}
+          sub={`${health.consistency.length} months checked against the transactions`}
+        />
+      </div>
+
+      <Section title="Scheduled events" icon="event_repeat">
+        <TableShell
+          loading={false}
+          error=""
+          empty={health.events.length === 0}
+          columns={[{ label: 'Event' }, { label: 'Status' }, { label: 'Schedule' }, { label: 'Last ran' }, { label: 'Next run' }, { label: 'Runs' }]}
+        >
+          {health.events.map((e) => (
+            <tr key={e.name} className="align-top">
+              <td className="py-3 px-space-md font-mono text-[12px] text-primary-container">{e.name}</td>
+              <td className="py-3 px-space-md"><Pill className={e.status === 'ENABLED' ? STATUS_STYLES.completed : STATUS_STYLES.failed}>{e.status.toLowerCase()}</Pill></td>
+              <td className="py-3 px-space-md whitespace-nowrap">Every {e.interval_value} {String(e.interval_field).toLowerCase()}{Number(e.interval_value) === 1 ? '' : 's'}</td>
+              <td className="py-3 px-space-md whitespace-nowrap">
+                {e.last_executed ? (
+                  <div className="flex flex-col">
+                    <span>{formatDateTime(e.last_executed)}</span>
+                    <span className="font-label-sm text-label-sm text-outline">{relativeTime(e.last_executed, health.serverTime)}</span>
+                  </div>
+                ) : 'Not yet'}
+              </td>
+              <td className="py-3 px-space-md whitespace-nowrap">
+                {e.next_run && schedulerOn ? (
+                  <div className="flex flex-col">
+                    <span>{formatDateTime(e.next_run)}</span>
+                    <span className="font-label-sm text-label-sm text-outline">{relativeTime(e.next_run, health.serverTime)}</span>
+                  </div>
+                ) : '—'}
+              </td>
+              <td className="py-3 px-space-md font-mono text-[11px] text-on-surface-variant">{e.definition}</td>
+            </tr>
+          ))}
+        </TableShell>
+      </Section>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-space-lg">
+        <Section title="Stored routines" icon="function">
+          <ul className="flex flex-col gap-1">
+            {health.routines.map((r) => (
+              <li key={r.name} className="flex items-center justify-between gap-space-sm p-2.5 rounded-lg bg-surface-container-low">
+                <span className="font-mono text-[12px] text-primary-container">{r.name}</span>
+                <Pill className={STATUS_STYLES.pending}>{String(r.type).toLowerCase()}</Pill>
+              </li>
+            ))}
+          </ul>
+        </Section>
+        <Section title="Triggers" icon="bolt">
+          <ul className="flex flex-col gap-1">
+            {health.triggers.map((t) => (
+              <li key={t.name} className="flex items-center justify-between gap-space-sm p-2.5 rounded-lg bg-surface-container-low">
+                <span className="font-mono text-[12px] text-primary-container">{t.name}</span>
+                <span className="font-label-sm text-label-sm text-on-surface-variant whitespace-nowrap">{t.timing} {t.event} on {t.table_name}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      </div>
+
+      <Section title="Run stored procedures now" icon="play_circle">
+        {actionError && <p role="alert" className="font-body-sm text-body-sm text-error">{actionError}</p>}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-space-md">
+          <div className="p-space-md rounded-xl bg-surface-container-low flex flex-col gap-space-sm">
+            <span className="font-label-md text-label-md font-semibold text-on-surface">Due-soon subscription check</span>
+            <p className="font-body-sm text-body-sm text-on-surface-variant">
+              Runs <code className="font-mono text-[12px]">sp_check_upcoming_subscriptions</code> for every user now, instead of waiting for the hourly event.
+              It adds one reminder per subscription due in the next 3 days and never repeats one.
+            </p>
+            <div className="flex flex-wrap items-center gap-space-sm">
+              <button type="button" onClick={runDueCheck} disabled={dueBusy} className={buttonClass}>
+                <span className="material-symbols-outlined text-[18px]">notifications_active</span>
+                {dueBusy ? 'Running…' : 'Run due-soon check now'}
+              </button>
+              {dueResult && (
+                <span role="status" className="font-body-sm text-body-sm text-on-surface">
+                  {dueResult.created
+                    ? `Created ${dueResult.created} new reminder${dueResult.created === 1 ? '' : 's'}.`
+                    : 'No new reminders: everything due in the next 3 days has already been notified.'}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="p-space-md rounded-xl bg-surface-container-low flex flex-col gap-space-sm">
+            <span className="font-label-md text-label-md font-semibold text-on-surface">Rebuild a month's summary</span>
+            <p className="font-body-sm text-body-sm text-on-surface-variant">
+              Runs <code className="font-mono text-[12px]">sp_generate_monthly_summary</code> for every user with data that month: deletes the month's
+              MonthlySummary rows and recomputes them from the transactions.
+            </p>
+            <div className="flex flex-wrap items-center gap-space-sm">
+              <select className={inputClass} value={selectedMonth} onChange={(e) => setRebuildMonth(e.target.value)} aria-label="Month to rebuild" disabled={!months.length}>
+                {months.map((m) => (
+                  <option key={m} value={m}>{monthName(m)}</option>
+                ))}
+              </select>
+              <button type="button" onClick={rebuild} disabled={rebuildBusy || !months.length} className={buttonClass}>
+                <span className="material-symbols-outlined text-[18px]">restart_alt</span>
+                {rebuildBusy ? 'Rebuilding…' : 'Rebuild'}
+              </button>
+            </div>
+            {rebuildResult && (
+              <div role="status" className="font-body-sm text-body-sm text-on-surface flex flex-col gap-1">
+                <span>{monthName(rebuildResult.month)}: rebuilt for {rebuildResult.users} user{rebuildResult.users === 1 ? '' : 's'}.</span>
+                <table className="text-left">
+                  <thead>
+                    <tr className="text-on-surface-variant font-label-sm text-label-sm uppercase">
+                      <th className="pr-space-md font-semibold"></th>
+                      <th className="pr-space-md font-semibold text-right">Rows</th>
+                      <th className="pr-space-md font-semibold text-right">Income</th>
+                      <th className="font-semibold text-right">Spending</th>
+                    </tr>
+                  </thead>
+                  <tbody className="font-mono text-[12px]">
+                    {['before', 'after'].map((k) => (
+                      <tr key={k}>
+                        <td className="pr-space-md capitalize font-body-sm text-body-sm">{k}</td>
+                        <td className="pr-space-md text-right">{rebuildResult[k].rows}</td>
+                        <td className="pr-space-md text-right">{inr(rebuildResult[k].income)}</td>
+                        <td className="text-right">{inr(rebuildResult[k].expense)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        title="Summary consistency"
+        icon="fact_check"
+        aside={<span className="font-label-sm text-label-sm text-outline">Transactions table vs. MonthlySummary, per user and month</span>}
+      >
+        <TableShell
+          loading={false}
+          error=""
+          empty={health.consistency.length === 0}
+          columns={[
+            { label: 'Month' }, { label: 'Income (transactions)', right: true }, { label: 'Income (summary)', right: true },
+            { label: 'Spending (transactions)', right: true }, { label: 'Spending (summary)', right: true }, { label: 'Status' },
+          ]}
+        >
+          {health.consistency.map((c) => (
+            <tr key={c.month}>
+              <td className="py-3 px-space-md whitespace-nowrap">{monthName(c.month)}</td>
+              <td className="py-3 px-space-md text-right font-mono">{inr(c.txnIncome)}</td>
+              <td className="py-3 px-space-md text-right font-mono">{inr(c.summaryIncome)}</td>
+              <td className="py-3 px-space-md text-right font-mono">{inr(c.txnExpense)}</td>
+              <td className="py-3 px-space-md text-right font-mono">{inr(c.summaryExpense)}</td>
+              <td className="py-3 px-space-md">
+                {c.mismatches ? (
+                  <Pill className={STATUS_STYLES.failed}>{c.mismatches} of {c.userMonths} users off</Pill>
+                ) : (
+                  <Pill className={STATUS_STYLES.completed}>Match</Pill>
+                )}
+              </td>
+            </tr>
+          ))}
+        </TableShell>
+      </Section>
+    </div>
+  );
+}
+
 export default function Admin() {
-  const user = getUser();
   const [tab, setTab] = useState('users');
   const [stats, setStats] = useState(null);
   const [statsError, setStatsError] = useState('');
@@ -381,17 +671,7 @@ export default function Admin() {
           <div className="flex items-center gap-space-md">
             <NotificationBell />
             <div className="h-6 w-px bg-surface-variant"></div>
-            <div className="flex items-center gap-space-sm pl-space-xs">
-              <img
-                alt="Profile"
-                className="w-8 h-8 rounded-full object-cover ring-1 ring-outline-variant"
-                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'Admin')}&background=0b1f3a&color=fff`}
-              />
-              <div className="hidden md:flex flex-col text-left">
-                <span className="font-label-md text-label-md font-semibold text-on-surface leading-tight">{user?.name || 'Admin'}</span>
-                <span className="font-label-sm text-label-sm text-secondary font-medium">Administrator</span>
-              </div>
-            </div>
+            <ProfileChip />
           </div>
         </div>
       </header>
@@ -432,9 +712,9 @@ export default function Admin() {
           <div className="flex flex-col w-full gap-space-lg">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-space-md pb-space-sm">
               <div className="flex flex-col gap-space-xs">
-                <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant">Administration · Read-only</span>
+                <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant">Administration</span>
                 <h1 className="font-headline-lg text-headline-lg text-primary-container tracking-tight">Admin Console</h1>
-                <p className="font-body-md text-body-md text-on-surface-variant">Platform users, statement uploads and the audit trail.</p>
+                <p className="font-body-md text-body-md text-on-surface-variant">Platform users, statement uploads, the audit trail and database health.</p>
               </div>
               <div className="flex flex-col items-start md:items-end gap-1 self-start md:self-auto">
                 <button
@@ -485,6 +765,7 @@ export default function Admin() {
               {tab === 'users' && <UsersTab refreshKey={refreshKey} />}
               {tab === 'uploads' && <UploadsTab refreshKey={refreshKey} />}
               {tab === 'audit' && <AuditTab refreshKey={refreshKey} />}
+              {tab === 'database' && <DatabaseTab refreshKey={refreshKey} onChanged={loadStats} />}
             </div>
           </div>
         </main>

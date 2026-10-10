@@ -16,7 +16,8 @@ import {
 } from 'chart.js';
 import { Doughnut, Bar, Line } from 'react-chartjs-2';
 import apiClient from '../api/client';
-import { getUser, clearSession } from '../api/auth';
+import { clearSession } from '../api/auth';
+import { ProfileChip } from '../components/ShellWidgets';
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, LineElement, PointElement, Tooltip, Legend, Filler);
 
@@ -119,7 +120,6 @@ function Panel({ title, subtitle, className = '', right, children }) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const user = getUser();
   const [data, setData] = useState(null);
   // The selected month lives in the URL (?month=YYYY-MM) so it survives a
   // refresh and works with Back/Forward and bookmarks. No (or an invalid)
@@ -219,17 +219,7 @@ export default function Dashboard() {
             )}
             <NotificationBell />
             <div className="h-6 w-px bg-surface-variant"></div>
-            <div className="flex items-center gap-space-sm pl-space-xs">
-              <img
-                alt="Profile"
-                className="w-8 h-8 rounded-full object-cover ring-1 ring-outline-variant"
-                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'FinTrack User')}&background=0b1f3a&color=fff`}
-              />
-              <div className="hidden md:flex flex-col text-left">
-                <span className="font-label-md text-label-md font-semibold text-on-surface leading-tight">{user?.name || 'Account'}</span>
-                <span className="font-label-sm text-label-sm text-secondary font-medium capitalize">{user?.role === 'admin' ? 'Administrator' : 'Standard Tier'}</span>
-              </div>
-            </div>
+            <ProfileChip />
           </div>
         </div>
       </header>

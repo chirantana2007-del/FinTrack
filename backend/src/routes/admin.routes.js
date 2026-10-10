@@ -6,7 +6,10 @@ const {
   getDashboard,
   listUsers,
   listUploads,
-  listAuditLog
+  listAuditLog,
+  getDatabaseHealth,
+  runDueCheck,
+  rebuildSummary
 } = require("../controllers/admin.controller");
 
 const router = express.Router();
@@ -17,5 +20,8 @@ router.get("/dashboard", asyncHandler(getDashboard));
 router.get("/users", asyncHandler(listUsers));
 router.get("/uploads", asyncHandler(listUploads));
 router.get("/audit-log", asyncHandler(listAuditLog));
+router.get("/database", asyncHandler(getDatabaseHealth));
+router.post("/database/run-due-check", asyncHandler(runDueCheck));
+router.post("/database/rebuild-summary", asyncHandler(rebuildSummary));
 
 module.exports = router;
