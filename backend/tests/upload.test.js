@@ -21,6 +21,9 @@ jest.mock("../src/services/notification.service", () => ({
 jest.mock("../src/services/audit.service", () => ({
   logAudit: jest.fn().mockResolvedValue()
 }));
+jest.mock("../src/services/anomaly.service", () => ({
+  syncAnomalyFlags: jest.fn().mockResolvedValue({ anomalies: [], changed: 0 })
+}));
 
 const pool = require("../src/config/db");
 const { syncSubscriptions } = require("../src/services/subscription.service");

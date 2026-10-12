@@ -302,3 +302,135 @@ describe("Subscription detection after upload", () => {
     expect(row.n).toBe(15); // 5 subscriptions x 3 charges
   });
 });
+
+describe("AI Insights on real data", () => {
+  // Twelve ordinary Swiggy orders in July plus one extreme ₹9,000 order.
+  const routine = [450, 470, 430, 500, 460, 440, 480, 455, 465, 445, 475, 435];
+  let uploadResponse;
+
+  beforeAll(async () => {
+    const lines = ["transaction_date,description,amount"];
+    routine.forEach((amount, i) => lines.push(`2026-07-${String(i + 1).padStart(2, "0")},SWIGGY ORDER ${3000 + i},-${amount}`));
+    lines.push("2026-07-20,SWIGGY ORDER 3999,-9000");
+    uploadResponse = await auth(request(app).post("/api/upload/csv")).attach("file", Buffer.from(lines.join("\n")), "insights.csv");
+  });
+
+  test("the upload saved the new orders", () => {
+    expect(uploadResponse.status).toBe(200);
+    expect(uploadResponse.body.insertedCount).toBe(routine.length + 1);
+  });
+
+  test("the upload already flagged the extreme order in the database", async () => {
+    const [rows] = await pool.query(
+      "SELECT amount, is_flagged_anomaly FROM Transactions WHERE account_id = ? AND description = 'SWIGGY ORDER 3999'",
+      [accountId]
+    );
+    expect(rows).toHaveLength(1);
+    expect(Number(rows[0].amount)).toBe(-9000);
+    expect(rows[0].is_flagged_anomaly).toBe(1);
+
+    const [[ordinary]] = await pool.query(
+      "SELECT is_flagged_anomaly FROM Transactions WHERE account_id = ? AND description = 'SWIGGY ORDER 3000'",
+      [accountId]
+    );
+    expect(ordinary.is_flagged_anomaly).toBe(0);
+  });
+
+  test("requires a login", async () => {
+    for (const [method, path] of [["get", "/api/insights/prediction"], ["get", "/api/insights/anomalies"], ["post", "/api/insights/nl-query"]]) {
+      expect((await request(app)[method](path)).status).toBe(401);
+    }
+  });
+
+  test("lists the extreme order as unusual, with the rule that caught it", async () => {
+    const response = await auth(request(app).get("/api/insights/anomalies"));
+
+    expect(response.status).toBe(200);
+    const flagged = response.body.anomalies.find((a) => a.amount === 9000);
+    expect(flagged).toMatchObject({ category: "Restaurants", merchant: "SWIGGY ORDER" });
+    expect(flagged.methods).toContain("z-score");
+    expect(flagged.zScore).toBeGreaterThan(2);
+    expect(response.body.anomalies.every((a) => a.amount > 0)).toBe(true);
+  });
+
+  test("the Dashboard's anomaly count matches the flags for that month", async () => {
+    const [[{ n }]] = await pool.query(
+      `SELECT COUNT(*) AS n FROM Transactions
+       WHERE account_id = ? AND is_flagged_anomaly = 1 AND transaction_date >= '2026-07-01' AND transaction_date < '2026-08-01'`,
+      [accountId]
+    );
+    const response = await auth(request(app).get("/api/analytics/dashboard?month=2026-07"));
+
+    expect(n).toBeGreaterThanOrEqual(1);
+    expect(response.body.data.totals.anomalyCount).toBe(n);
+  });
+
+  test("the forecast is positive and has a real trend", async () => {
+    const response = await auth(request(app).get("/api/insights/prediction"));
+
+    expect(response.status).toBe(200);
+    const entries = Object.entries(response.body.predictions);
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [, forecast] of entries) {
+      expect(forecast.value).toBeGreaterThan(0);
+      expect(forecast.trend).toMatch(/^([+-]\d+(\.\d+)?%|New)$/);
+      expect(Object.values(forecast.months).every((v) => v >= 0)).toBe(true);
+    }
+    expect(response.body.basis.monthsUsed).toBeGreaterThan(0);
+  });
+
+  test("answers match totals computed straight from the database", async () => {
+    const [[food]] = await pool.query(
+      `SELECT SUM(-t.amount) AS total, COUNT(*) AS n
+       FROM Transactions t JOIN Categories c ON c.category_id = t.category_id
+       WHERE t.account_id = ? AND t.amount < 0 AND c.type = 'expense'
+         AND (c.name LIKE '%Food%' OR c.name LIKE '%Restaurant%' OR c.name LIKE '%Groceries%')`,
+      [accountId]
+    );
+    const [[all]] = await pool.query("SELECT SUM(-amount) AS total, COUNT(*) AS n FROM Transactions WHERE account_id = ? AND amount < 0", [accountId]);
+    const ask = (query) => auth(request(app).post("/api/insights/nl-query")).send({ query });
+
+    const foodAnswer = (await ask("how much did I spend on food")).body.result;
+    expect(foodAnswer.totalAmount).toBeCloseTo(Number(food.total), 2);
+    expect(foodAnswer.count).toBe(food.n);
+    expect(foodAnswer.totalAmount).toBeGreaterThan(9000);
+
+    const totalAnswer = (await ask("what is my total spending")).body.result;
+    expect(totalAnswer.totalAmount).toBeCloseTo(Number(all.total), 2);
+    expect(totalAnswer.count).toBe(all.n);
+
+    const [[top]] = await pool.query(
+      "SELECT description, -amount AS spent FROM Transactions WHERE account_id = ? AND amount < 0 ORDER BY amount ASC LIMIT 1",
+      [accountId]
+    );
+    const biggest = (await ask("what was my highest expense")).body.result;
+    expect(biggest.totalAmount).toBe(Number(top.spent));
+    expect(biggest.totalAmount).toBeGreaterThanOrEqual(9000);
+    expect(biggest.interpretation).toContain(top.description);
+  });
+
+  test("a named month limits the answer to that month", async () => {
+    const [[july]] = await pool.query(
+      `SELECT SUM(-t.amount) AS total FROM Transactions t JOIN Categories c ON c.category_id = t.category_id
+       WHERE t.account_id = ? AND t.amount < 0 AND c.name LIKE '%Restaurant%'
+         AND t.transaction_date >= '2026-07-01' AND t.transaction_date < '2026-08-01'`,
+      [accountId]
+    );
+    const response = await auth(request(app).post("/api/insights/nl-query")).send({ query: "how much did I spend at restaurants in july 2026" });
+
+    expect(response.body.result.period).toBe("July 2026");
+    expect(response.body.result.totalAmount).toBeCloseTo(Number(july.total), 2);
+  });
+
+  test("another user doesn't see this user's data", async () => {
+    const email = "someone.else@fintrack.test";
+    await request(app).post("/api/auth/register").send({ name: "Someone Else", email, password: "s3cret-pass" });
+    const login = await request(app).post("/api/auth/login").send({ email, password: "s3cret-pass" });
+    const other = (req) => req.set("Authorization", `Bearer ${login.body.token}`);
+
+    expect((await other(request(app).get("/api/insights/anomalies"))).body.anomalies).toEqual([]);
+    expect((await other(request(app).get("/api/insights/prediction"))).body.predictions).toEqual({});
+    const answer = (await other(request(app).post("/api/insights/nl-query")).send({ query: "how much did I spend on food" })).body.result;
+    expect(answer).toMatchObject({ totalAmount: 0, count: 0 });
+  });
+});

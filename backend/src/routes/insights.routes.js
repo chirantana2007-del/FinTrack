@@ -1,13 +1,15 @@
 const express = require('express');
-const router = express.Router();
+const authMiddleware = require('../middleware/auth.middleware');
+const asyncHandler = require('../utils/asyncHandler');
 const insightsController = require('../controllers/insights.controller');
 
-// Optional: require auth middleware if member 1/2 created it
-// const auth = require('../middleware/auth.middleware');
-// For now, we will use it without middleware or we can apply it if needed.
+const router = express.Router();
 
-router.get('/prediction', insightsController.getPrediction);
-router.get('/anomalies', insightsController.getAnomalies);
-router.post('/nl-query', insightsController.nlQuery);
+// Everything here is calculated from the signed-in user's own transactions.
+router.use(authMiddleware);
+
+router.get('/prediction', asyncHandler(insightsController.getPrediction));
+router.get('/anomalies', asyncHandler(insightsController.getAnomalies));
+router.post('/nl-query', asyncHandler(insightsController.nlQuery));
 
 module.exports = router;
