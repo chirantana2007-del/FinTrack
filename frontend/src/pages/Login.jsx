@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/client';
 import { setSession } from '../api/auth';
 
+
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -32,7 +33,7 @@ export default function Login() {
 <div className="w-full bg-surface-container-lowest shadow-sm rounded-lg p-space-lg flex flex-col gap-space-lg">
 <div className="flex flex-col items-center text-center gap-space-sm">
 <div className="h-10 w-auto flex items-center justify-center mb-space-xs">
-<img alt="FinTrack Institutional Ledger System" className="h-9 w-auto object-contain" src="/favicon.svg"/>
+<img alt="FinTrack Institutional Ledger System" className="h-9 w-auto object-contain" src="/fintrack.svg"/>
 </div>
 <div className="flex flex-col gap-space-xs">
 <div className="inline-flex items-center justify-center gap-1.5 self-center px-2 py-0.5 rounded-DEFAULT bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">

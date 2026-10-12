@@ -662,7 +662,7 @@ export default function Admin() {
       <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
         <div className="w-full h-full px-margin-desktop flex items-center justify-between">
           <div className="flex items-center gap-space-sm">
-            <img alt="FinTrack logo" className="h-8 w-auto object-contain" src="/favicon.svg" />
+            <img alt="FinTrack logo" className="h-8 w-auto object-contain" src="/fintrack.svg" />
             <div className="flex flex-col">
               <span className="font-headline-sm text-headline-sm font-semibold tracking-tight text-primary-container leading-none">FinTrack</span>
               <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mt-0.5">Personal Finance Analytics</span>

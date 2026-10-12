@@ -197,7 +197,7 @@ export default function Dashboard() {
         <div className="w-full h-full px-margin-desktop flex items-center justify-between">
           <div className="flex items-center gap-space-lg">
             <div className="flex items-center gap-space-sm">
-              <img alt="FinTrack logo" className="h-8 w-auto object-contain" src="/favicon.svg" />
+              <img alt="FinTrack logo" className="h-8 w-auto object-contain" src="/fintrack.svg" />
               <div className="flex flex-col">
                 <span className="font-headline-sm text-headline-sm font-semibold tracking-tight text-primary-container leading-none">FinTrack</span>
                 <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mt-0.5">Personal Finance Analytics</span>
