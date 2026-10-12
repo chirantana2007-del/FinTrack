@@ -2,25 +2,53 @@ import React, { useState, useEffect } from 'react';
 import NotificationBell from '../components/NotificationBell';
 import AdminNavLink from '../components/AdminNavLink';
 import { CurrentMonthLabel, ProfileChip, MonthlyCapCard } from '../components/ShellWidgets';
-import axios from 'axios';
 import apiClient from '../api/client';
+
+// Icons for the categories the forecast can show; anything else gets a generic one.
+const CATEGORY_ICONS = {
+  Groceries: 'shopping_cart',
+  Restaurants: 'restaurant',
+  Fuel: 'local_gas_station',
+  'Public Transit': 'directions_transit',
+  Housing: 'home',
+  Utilities: 'bolt',
+  Healthcare: 'medical_services',
+  Shopping: 'shopping_bag',
+  Entertainment: 'movie',
+  Subscriptions: 'subscriptions',
+  Miscellaneous: 'category',
+};
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function monthName(month) {
+  const [year, m] = month.split('-').map(Number);
+  return `${MONTH_NAMES[m - 1]} ${year}`;
+}
 
 export default function Insights() {
   const [predictionData, setPredictionData] = useState(null);
+  const [forecastBasis, setForecastBasis] = useState(null);
   const [anomalies, setAnomalies] = useState([]);
-  const [nlQuery, setNlQuery] = useState('How much did I spend on Dining in October 2024?');
+  const [anomalyTotal, setAnomalyTotal] = useState(0);
+  const [nlQuery, setNlQuery] = useState('How much did I spend on food last month?');
   const [nlResult, setNlResult] = useState(null);
   const [loadingNl, setLoadingNl] = useState(false);
 
   useEffect(() => {
     // Fetch Predictions
     apiClient.get('/insights/prediction').then(res => {
-      if (res.data.success) setPredictionData(res.data.predictions);
+      if (res.data.success) {
+        setPredictionData(res.data.predictions);
+        setForecastBasis(res.data.basis);
+      }
     }).catch(console.error);
 
     // Fetch Anomalies
     apiClient.get('/insights/anomalies').then(res => {
-      if (res.data.success) setAnomalies(res.data.anomalies);
+      if (res.data.success) {
+        setAnomalies(res.data.anomalies);
+        setAnomalyTotal(res.data.totalFlagged ?? res.data.anomalies.length);
+      }
     }).catch(console.error);
   }, []);
 
@@ -97,9 +125,12 @@ export default function Insights() {
           <div className="lg:col-span-12 flex flex-col">
             <span className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">Total Amount</span>
             <div className="flex items-baseline gap-space-xs mt-0.5">
-              <span className="font-headline-lg text-headline-lg text-primary-container font-semibold">₹{Number(nlResult.totalAmount).toLocaleString()}</span>
-              <span className="font-body-sm text-body-sm text-on-surface-variant">across {nlResult.count} transactions</span>
+              <span className="font-headline-lg text-headline-lg text-primary-container font-semibold">₹{Number(nlResult.totalAmount).toLocaleString('en-IN')}</span>
+              <span className="font-body-sm text-body-sm text-on-surface-variant">across {nlResult.count} {nlResult.count === 1 ? 'transaction' : 'transactions'}</span>
             </div>
+            {nlResult.interpretation && (
+              <span className="font-body-sm text-body-sm text-on-surface-variant mt-1">Understood as: {nlResult.interpretation}</span>
+            )}
           </div>
         </div>
         <div className="pt-space-xs flex flex-col sm:flex-row sm:items-center justify-between gap-space-xs">
@@ -124,7 +155,11 @@ export default function Insights() {
         <div className="w-2 h-2 rounded-full bg-secondary"></div>
         <h2 className="font-headline-md text-headline-md text-primary-container">Next Month Spend Forecast</h2>
       </div>
-      <p className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Based on your past 3 months of spending habits.</p>
+      <p className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+        {forecastBasis
+          ? `Average of your last ${forecastBasis.monthsUsed} ${forecastBasis.monthsUsed === 1 ? 'month' : 'months'} (${forecastBasis.months.map(monthName).join(', ')})${forecastBasis.partialMonthExcluded ? ', not counting the month still in progress' : ''}.`
+          : 'Based on your past 3 months of spending habits.'}
+      </p>
     </div>
   </div>
 
@@ -134,7 +169,7 @@ export default function Insights() {
         <div>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-space-xs">
-              <span className="material-symbols-outlined text-primary-container text-[20px]">{category === 'Groceries' ? 'shopping_cart' : category === 'Utilities' ? 'bolt' : 'restaurant'}</span>
+              <span className="material-symbols-outlined text-primary-container text-[20px]">{CATEGORY_ICONS[category] || 'category'}</span>
               <span className="font-headline-sm text-headline-sm text-primary-container">{category}</span>
             </div>
             <span className={`flex items-center gap-0.5 px-space-xs py-0.5 rounded-lg font-numeric-sm text-numeric-sm font-semibold ${data.trend.includes('-') ? 'bg-secondary-fixed text-on-secondary-fixed-variant' : 'bg-surface-container-high text-error'}`}>
@@ -143,7 +178,7 @@ export default function Insights() {
             </span>
           </div>
           <div className="mt-space-md flex items-baseline gap-space-xs">
-            <span className="font-headline-lg text-headline-lg font-semibold text-primary-container">₹{data.value.toLocaleString()}</span>
+            <span className="font-headline-lg text-headline-lg font-semibold text-primary-container">₹{Math.round(data.value).toLocaleString('en-IN')}</span>
             <span className="font-label-sm text-label-sm text-outline uppercase font-semibold">est. projected</span>
           </div>
           <div className="py-space-sm">
@@ -156,6 +191,11 @@ export default function Insights() {
         </div>
       </div>
     ))}
+    {predictionData && Object.keys(predictionData).length === 0 && (
+      <p className="font-body-md text-body-md text-on-surface-variant md:col-span-3 p-4 text-center">
+        No spending history yet. Upload a bank statement and your forecast will appear here.
+      </p>
+    )}
   </div>
 </section>
 
@@ -171,7 +211,7 @@ export default function Insights() {
     </div>
     <div className="flex items-center gap-1.5 px-space-md py-1 rounded-lg bg-tertiary-fixed text-on-tertiary-fixed self-start sm:self-auto shadow-sm">
       <span className="material-symbols-outlined text-[16px] text-on-tertiary-container">warning</span>
-      <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold">{anomalies.length} flagged items requiring review</span>
+      <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold">{anomalyTotal > anomalies.length ? `Showing ${anomalies.length} of ${anomalyTotal} flagged, newest first` : `${anomalies.length} flagged ${anomalies.length === 1 ? 'item' : 'items'} requiring review`}</span>
     </div>
   </div>
 
@@ -188,6 +228,11 @@ export default function Insights() {
             <div className="flex flex-wrap items-center gap-space-xs">
               <span className="font-headline-sm text-headline-sm text-on-surface font-medium">{anomaly.merchant}</span>
               <span className="px-space-xs py-0.5 rounded-lg bg-error-container text-on-error-container font-label-sm text-label-sm font-semibold uppercase">High Spend</span>
+              {(anomaly.methods || []).map((method) => (
+                <span key={method} title={method === 'iqr' ? 'Above the interquartile-range upper fence for this category' : 'More than 2 standard deviations above the category average'} className="px-space-xs py-0.5 rounded-lg bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-semibold uppercase">
+                  {method === 'iqr' ? 'IQR' : 'Z-score'}
+                </span>
+              ))}
               <span className="font-numeric-sm text-numeric-sm text-outline">{new Date(anomaly.date).toLocaleDateString()}</span>
             </div>
             <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">{anomaly.reason}</p>
@@ -195,7 +240,7 @@ export default function Insights() {
         </div>
         <div className="flex items-center justify-between lg:justify-end gap-space-lg shrink-0 pt-space-xs lg:pt-0">
           <div className="flex flex-col text-right">
-            <span className="font-numeric-lg text-numeric-lg text-primary-container font-semibold">₹{Number(anomaly.amount).toLocaleString()}</span>
+            <span className="font-numeric-lg text-numeric-lg text-primary-container font-semibold">₹{Number(anomaly.amount).toLocaleString('en-IN')}</span>
             <span className="font-label-sm text-label-sm text-outline">{anomaly.category}</span>
           </div>
         </div>

@@ -5,6 +5,7 @@ const { categorizeTransaction } = require("../services/categorization.service");
 const { syncSubscriptions } = require("../services/subscription.service");
 const { checkUpcomingSubscriptions } = require("../services/notification.service");
 const { logAudit } = require("../services/audit.service");
+const { syncAnomalyFlags } = require("../services/anomaly.service");
 
 const uploadCsv = async (req, res) => {
   if (!req.file) {
@@ -132,6 +133,13 @@ const uploadCsv = async (req, res) => {
         await checkUpcomingSubscriptions(userId);
       } catch (syncErr) {
         console.error("Subscription detection after upload failed:", syncErr);
+      }
+
+      // Same for the unusual-transaction flags the Dashboard counts.
+      try {
+        await syncAnomalyFlags(userId);
+      } catch (flagErr) {
+        console.error("Anomaly flagging after upload failed:", flagErr);
       }
     }
 
