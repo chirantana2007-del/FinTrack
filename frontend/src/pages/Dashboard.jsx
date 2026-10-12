@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import NotificationBell from '../components/NotificationBell';
 import AdminNavLink from '../components/AdminNavLink';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Chart as ChartJS,
   ArcElement,
@@ -16,7 +16,8 @@ import {
 } from 'chart.js';
 import { Doughnut, Bar, Line } from 'react-chartjs-2';
 import apiClient from '../api/client';
-import { getUser, clearSession } from '../api/auth';
+import { clearSession } from '../api/auth';
+import { ProfileChip } from '../components/ShellWidgets';
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, LineElement, PointElement, Tooltip, Legend, Filler);
 
@@ -119,9 +120,14 @@ function Panel({ title, subtitle, className = '', right, children }) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const user = getUser();
   const [data, setData] = useState(null);
-  const [month, setMonth] = useState(null); // null = let the server pick
+  // The selected month lives in the URL (?month=YYYY-MM) so it survives a
+  // refresh and works with Back/Forward and bookmarks. No (or an invalid)
+  // ?month = let the server pick.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const monthParam = searchParams.get('month');
+  const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(monthParam || '') ? monthParam : null;
+  const setMonth = (value) => setSearchParams({ month: value.slice(0, 7) });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -213,17 +219,7 @@ export default function Dashboard() {
             )}
             <NotificationBell />
             <div className="h-6 w-px bg-surface-variant"></div>
-            <div className="flex items-center gap-space-sm pl-space-xs">
-              <img
-                alt="Profile"
-                className="w-8 h-8 rounded-full object-cover ring-1 ring-outline-variant"
-                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'FinTrack User')}&background=0b1f3a&color=fff`}
-              />
-              <div className="hidden md:flex flex-col text-left">
-                <span className="font-label-md text-label-md font-semibold text-on-surface leading-tight">{user?.name || 'Account'}</span>
-                <span className="font-label-sm text-label-sm text-secondary font-medium capitalize">{user?.role === 'admin' ? 'Administrator' : 'Standard Tier'}</span>
-              </div>
-            </div>
+            <ProfileChip />
           </div>
         </div>
       </header>
@@ -346,7 +342,12 @@ export default function Dashboard() {
               onChange={(e) => setMonth(e.target.value)}
               className="appearance-none pl-10 pr-8 py-1.5 bg-surface-container-lowest text-primary-container font-label-md text-label-md font-semibold rounded-lg shadow-sm hover:bg-surface-container-low transition-colors outline-none cursor-pointer"
             >
-              {(data.availableMonths.length ? data.availableMonths : [period.month]).map((m) => (
+              {/* A month from the URL may have no transactions; keep it listed so the
+                  picker shows the month actually on screen. */}
+              {(data.availableMonths.includes(period.month)
+                ? data.availableMonths
+                : [...data.availableMonths, period.month].sort().reverse()
+              ).map((m) => (
                 <option key={m} value={m}>{monthText(m)}</option>
               ))}
             </select>

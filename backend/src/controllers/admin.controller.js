@@ -1,7 +1,9 @@
 const pool = require("../config/db");
+const { logAudit } = require("../services/audit.service");
 
-// Read-only views over Users, UploadedFiles and AuditLog for the admin
-// dashboard (Task 26). Every route here sits behind authMiddleware + adminOnly.
+// Admin console (Task 26): read-only views over Users, UploadedFiles and
+// AuditLog, plus database health with two on-demand stored-procedure runs.
+// Every route here sits behind authMiddleware + adminOnly.
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 200;
@@ -158,9 +160,176 @@ const listAuditLog = async (req, res) => {
     return res.json({ entries, total, limit: page.limit, offset: page.offset });
 };
 
+// ---------------------------------------------------------------------------
+// Database health: the DB-side objects (event, routines, trigger) and whether
+// MonthlySummary agrees with Transactions. The two POST actions let an admin
+// run the stored procedures on demand; both are safe to repeat.
+// ---------------------------------------------------------------------------
+
+const INTERVAL_MS = { SECOND: 1e3, MINUTE: 60e3, HOUR: 3600e3, DAY: 86400e3, WEEK: 604800e3 };
+
+// LAST_EXECUTED + interval. Events can't report their next run directly; this
+// is exact for fixed-length intervals and null for MONTH/YEAR schedules.
+function nextRun(event) {
+    const unit = INTERVAL_MS[event.interval_field];
+    if (!event.last_executed || !unit || event.status !== "ENABLED") return null;
+    const last = new Date(String(event.last_executed).replace(" ", "T"));
+    const next = new Date(last.getTime() + Number(event.interval_value) * unit);
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())} ${pad(next.getHours())}:${pad(next.getMinutes())}:${pad(next.getSeconds())}`;
+}
+
+// Per user and month: totals recomputed from Transactions vs. what
+// MonthlySummary holds. Mismatches are counted per user-month so that errors
+// in different users can't cancel out in the monthly sums.
+const CONSISTENCY_SQL = `
+    WITH txn AS (
+        SELECT a.user_id, DATE_FORMAT(t.transaction_date, '%Y-%m-01') AS month,
+               SUM(IF(t.amount > 0, t.amount, 0)) AS income,
+               SUM(IF(t.amount < 0, -t.amount, 0)) AS expense
+        FROM Transactions t
+        JOIN Accounts a ON a.account_id = t.account_id
+        GROUP BY a.user_id, month
+    ),
+    summary AS (
+        SELECT user_id, DATE_FORMAT(period_month, '%Y-%m-01') AS month,
+               SUM(total_income) AS income, SUM(total_expense) AS expense
+        FROM MonthlySummary
+        GROUP BY user_id, month
+    ),
+    keyset AS (
+        SELECT user_id, month FROM txn
+        UNION
+        SELECT user_id, month FROM summary
+    )
+    SELECT k.month,
+           COUNT(*) AS userMonths,
+           ROUND(SUM(COALESCE(txn.income, 0)), 2) AS txnIncome,
+           ROUND(SUM(COALESCE(txn.expense, 0)), 2) AS txnExpense,
+           ROUND(SUM(COALESCE(summary.income, 0)), 2) AS summaryIncome,
+           ROUND(SUM(COALESCE(summary.expense, 0)), 2) AS summaryExpense,
+           SUM(ROUND(COALESCE(txn.income, 0), 2) <> ROUND(COALESCE(summary.income, 0), 2)
+            OR ROUND(COALESCE(txn.expense, 0), 2) <> ROUND(COALESCE(summary.expense, 0), 2)) AS mismatches
+    FROM keyset k
+    LEFT JOIN txn ON txn.user_id = k.user_id AND txn.month = k.month
+    LEFT JOIN summary ON summary.user_id = k.user_id AND summary.month = k.month
+    GROUP BY k.month
+    ORDER BY k.month DESC`;
+
+function toMonthStart(value) {
+    const match = /^(\d{4})-(0[1-9]|1[0-2])(-\d{2})?$/.exec(String(value || ""));
+    return match ? `${match[1]}-${match[2]}-01` : null;
+}
+
+async function summaryTotals(month) {
+    const [[row]] = await pool.execute(
+        `SELECT COUNT(*) AS rows_, ROUND(COALESCE(SUM(total_income), 0), 2) AS income,
+                ROUND(COALESCE(SUM(total_expense), 0), 2) AS expense
+         FROM MonthlySummary WHERE period_month = ?`,
+        [month]
+    );
+    return { rows: Number(row.rows_), income: Number(row.income), expense: Number(row.expense) };
+}
+
+const getDatabaseHealth = async (req, res) => {
+    const [[{ scheduler }]] = await pool.query("SELECT @@event_scheduler AS scheduler");
+
+    const [events] = await pool.query(
+        `SELECT EVENT_NAME AS name, STATUS AS status, INTERVAL_VALUE AS interval_value,
+                INTERVAL_FIELD AS interval_field, LAST_EXECUTED AS last_executed,
+                EVENT_DEFINITION AS definition
+         FROM information_schema.EVENTS
+         WHERE EVENT_SCHEMA = DATABASE()
+         ORDER BY EVENT_NAME`
+    );
+
+    const [routines] = await pool.query(
+        `SELECT ROUTINE_NAME AS name, ROUTINE_TYPE AS type, CREATED AS created
+         FROM information_schema.ROUTINES
+         WHERE ROUTINE_SCHEMA = DATABASE()
+         ORDER BY ROUTINE_TYPE, ROUTINE_NAME`
+    );
+
+    const [triggers] = await pool.query(
+        `SELECT TRIGGER_NAME AS name, ACTION_TIMING AS timing, EVENT_MANIPULATION AS event,
+                EVENT_OBJECT_TABLE AS table_name
+         FROM information_schema.TRIGGERS
+         WHERE TRIGGER_SCHEMA = DATABASE()
+         ORDER BY TRIGGER_NAME`
+    );
+
+    const [consistency] = await pool.query(CONSISTENCY_SQL);
+
+    return res.json({
+        scheduler,
+        serverTime: (await pool.query("SELECT NOW() AS now"))[0][0].now,
+        events: events.map((e) => ({ ...e, next_run: nextRun(e) })),
+        routines,
+        triggers,
+        consistency: consistency.map((row) => ({
+            month: row.month,
+            userMonths: Number(row.userMonths),
+            txnIncome: Number(row.txnIncome),
+            txnExpense: Number(row.txnExpense),
+            summaryIncome: Number(row.summaryIncome),
+            summaryExpense: Number(row.summaryExpense),
+            mismatches: Number(row.mismatches)
+        }))
+    });
+};
+
+// Same work the hourly event does, run now for every user.
+const runDueCheck = async (req, res) => {
+    const countSql = "SELECT COUNT(*) AS n FROM Notifications WHERE type = 'subscription_due'";
+    const [[before]] = await pool.query(countSql);
+    await pool.query("CALL sp_check_upcoming_subscriptions(NULL)");
+    const [[after]] = await pool.query(countSql);
+    const created = Number(after.n) - Number(before.n);
+
+    await logAudit({ userId: req.user.id, action: "admin.run_due_check", details: { created } });
+
+    return res.json({ created });
+};
+
+// Rebuilds one month's MonthlySummary rows for every user with data in it.
+const rebuildSummary = async (req, res) => {
+    const month = toMonthStart(req.body.month);
+    if (!month) {
+        return res.status(400).json({ message: "month (YYYY-MM) is required" });
+    }
+
+    // Users with transactions that month, plus any with summary rows for it
+    // (so stale rows for a month whose transactions were removed get cleared).
+    const [users] = await pool.execute(
+        `SELECT DISTINCT a.user_id
+         FROM Transactions t JOIN Accounts a ON a.account_id = t.account_id
+         WHERE t.transaction_date >= ? AND t.transaction_date < ? + INTERVAL 1 MONTH
+         UNION
+         SELECT DISTINCT user_id FROM MonthlySummary WHERE period_month = ?`,
+        [month, month, month]
+    );
+
+    const before = await summaryTotals(month);
+    for (const { user_id: userId } of users) {
+        await pool.query("CALL sp_generate_monthly_summary(?, ?)", [userId, month]);
+    }
+    const after = await summaryTotals(month);
+
+    await logAudit({
+        userId: req.user.id,
+        action: "admin.rebuild_summary",
+        details: { month: month.slice(0, 7), users: users.length, before, after }
+    });
+
+    return res.json({ month, users: users.length, before, after });
+};
+
 module.exports = {
     getDashboard,
     listUsers,
     listUploads,
-    listAuditLog
+    listAuditLog,
+    getDatabaseHealth,
+    runDueCheck,
+    rebuildSummary
 };

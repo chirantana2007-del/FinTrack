@@ -11,7 +11,8 @@
     "test:integration": "jest --config jest.integration.config.js --runInBand",
     "bench:indexes": "node scripts/index-benchmark.js",
     "db:backup": "node scripts/db-backup.js",
-    "drill:backup": "node scripts/backup-drill.js"
+    "drill:backup": "node scripts/backup-drill.js",
+    "verify:dashboard": "node scripts/verify-dashboard.js"
   },
   "jest": {
     "testPathIgnorePatterns": [
